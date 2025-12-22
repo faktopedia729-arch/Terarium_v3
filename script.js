@@ -93,29 +93,25 @@ function initChart() {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-            x: {
-                grid: { color: '#333', drawOnChartArea: true }, // Widoczna kratka pionowa
-                ticks: { color: '#888', maxRotation: 45, minRotation: 45 }
-            },
-            y: { // Oś temperatury (lewa)
-                type: 'linear',
-                display: true,
-                position: 'left',
-                title: { display: true, text: 'Temp °C', color: '#ff3b30' },
-                grid: { color: '#333' }, // Kratka pozioma
-                ticks: { color: '#ff3b30' },
-                min: 15, max: 40 // Stały zakres dla lepszej czytelności
-            },
-            y1: { // Oś wilgotności (prawa)
-                type: 'linear',
-                display: true,
-                position: 'right',
-                title: { display: true, text: 'Wilg %', color: '#007aff' },
-                ticks: { color: '#007aff' },
-                min: 30, max: 100, // Stały zakres dla wilgotności
-                grid: { drawOnChartArea: false } // Wyłączamy dublowanie siatki poziomiej
-            }
+    x: {
+        display: true,
+        grid: {
+            display: true,
+            color: 'rgba(255, 255, 255, 0.1)' // Delikatna kratka pionowa
         },
+        ticks: {
+            color: '#888',
+            autoSkip: true,
+            maxTicksLimit: 10 // Ogranicza liczbę godzin na dole, by nie było tłoczno
+        }
+    },
+    y: {
+        grid: {
+            display: true,
+            color: 'rgba(255, 255, 255, 0.1)' // Delikatna kratka pozioma
+        }
+    }
+}
         plugins: {
             legend: { labels: { color: '#fff' } }
         }

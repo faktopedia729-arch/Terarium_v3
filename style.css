@@ -31,11 +31,12 @@ h3 { font-size: 1rem; margin-top: 20px; color: var(--accent); }
 
 /* --- KARTY (SEKCJE) --- */
 .card {
-    background: var(--card-bg);
-    border-radius: 16px;
-    padding: 25px;
-    margin-bottom: 20px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    background: var(--card);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 25px; /* Zwiększony odstęp między sekcjami */
+    display: block;      /* Zapobiega nakładaniu się */
+    overflow: hidden;    /* Trzyma zawartość wewnątrz krawędzi */
 }
 
 /* --- LOGOWANIE --- */
@@ -156,10 +157,10 @@ input[type="number"] {
 /* --- WYKRES --- */
 .chart-container {
     position: relative;
-    height: 350px; /* Zwiększono z 250px dla lepszej czytelności kratki */
+    height: 350px; 
     width: 100%;
+    margin-bottom: 20px;
 }
-
 /* --- RESPONSYWNOŚĆ --- */
 @media (max-width: 600px) {
     body { padding: 10px; }
