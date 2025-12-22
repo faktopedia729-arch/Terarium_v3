@@ -155,9 +155,9 @@ input[type="number"] {
 
 /* --- WYKRES --- */
 .chart-container {
+    position: relative;
+    height: 350px; /* Zwiększono z 250px dla lepszej czytelności kratki */
     width: 100%;
-    height: 250px;
-    margin-top: 10px;
 }
 
 /* --- RESPONSYWNOŚĆ --- */

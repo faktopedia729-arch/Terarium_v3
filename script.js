@@ -64,17 +64,63 @@ document.getElementById('led-toggle-btn').onclick = () => toggleDevice('led');
 
 function initChart() {
     const ctx = document.getElementById('mainChart').getContext('2d');
-    const chart = new Chart(ctx, { 
-        type: 'line', 
-        data: { labels: [], datasets: [
-            { label: 'Temp °C', borderColor: '#ff3b30', data: [], tension: 0.3 }, 
-            { label: 'Wilgotność %', borderColor: '#007aff', data: [], tension: 0.3 }
-        ]}, 
-        options: { 
-            responsive: true,
-            scales: { x: { display: true, ticks: { color: '#888' } } } 
-        } 
-    });
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Temperatura (°C)',
+                    borderColor: '#ff3b30', // Czerwony
+                    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+                    data: [],
+                    yAxisID: 'y', // Przypisanie do lewej osi
+                    tension: 0.3,
+                    fill: true
+                },
+                {
+                    label: 'Wilgotność (%)',
+                    borderColor: '#007aff', // Niebieski
+                    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+                    data: [],
+                    yAxisID: 'y1', // Przypisanie do prawej osi
+                    tension: 0.3,
+                    fill: true
+                }
+            ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            x: {
+                grid: { color: '#333', drawOnChartArea: true }, // Widoczna kratka pionowa
+                ticks: { color: '#888', maxRotation: 45, minRotation: 45 }
+            },
+            y: { // Oś temperatury (lewa)
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: { display: true, text: 'Temp °C', color: '#ff3b30' },
+                grid: { color: '#333' }, // Kratka pozioma
+                ticks: { color: '#ff3b30' },
+                min: 15, max: 40 // Stały zakres dla lepszej czytelności
+            },
+            y1: { // Oś wilgotności (prawa)
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: { display: true, text: 'Wilg %', color: '#007aff' },
+                ticks: { color: '#007aff' },
+                min: 30, max: 100, // Stały zakres dla wilgotności
+                grid: { drawOnChartArea: false } // Wyłączamy dublowanie siatki poziomiej
+            }
+        },
+        plugins: {
+            legend: { labels: { color: '#fff' } }
+        }
+    }
+});
 
     // Funkcja pobierająca dane z Firebase
     window.updateChartRange = (points) => {
