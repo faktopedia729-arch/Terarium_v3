@@ -64,11 +64,41 @@ document.getElementById('led-toggle-btn').onclick = () => toggleDevice('led');
 
 function initChart() {
     const ctx = document.getElementById('mainChart').getContext('2d');
-    const chart = new Chart(ctx, {
-        type: 'line',
-        data: { labels: [], datasets: [{ label: 'Temp', borderColor: '#e74c3c', data: [] }, { label: 'Hum', borderColor: '#3498db', data: [] }] },
-        options: { responsive: true, scales: { x: { display: false } } }
+    const chart = new Chart(ctx, { 
+        type: 'line', 
+        data: { labels: [], datasets: [
+            { label: 'Temp °C', borderColor: '#ff3b30', data: [], tension: 0.3 }, 
+            { label: 'Wilgotność %', borderColor: '#007aff', data: [], tension: 0.3 }
+        ]}, 
+        options: { 
+            responsive: true,
+            scales: { x: { display: true, ticks: { color: '#888' } } } 
+        } 
     });
+
+    // Funkcja pobierająca dane z Firebase
+    window.updateChartRange = (points) => {
+        const historyRef = query(ref(db, 'history'), limitToLast(points));
+        onValue(historyRef, (sn) => {
+            const d = sn.val(); if (!d) return;
+            chart.data.labels = []; 
+            chart.data.datasets[0].data = []; 
+            chart.data.datasets[1].data = [];
+            
+            Object.keys(d).sort().forEach(k => {
+                const date = new Date(parseInt(k) * 1000);
+                const timeStr = date.getHours() + ":" + (date.getMinutes() < 10 ? '0' : '') + date.getMinutes();
+                
+                chart.data.labels.push(timeStr);
+                chart.data.datasets[0].data.push(d[k].t);
+                chart.data.datasets[1].data.push(d[k].h);
+            });
+            chart.update();
+        });
+    };
+
+    // Domyślne załadowanie 20 punktów (5h) przy starcie
+    updateChartRange(20);
 
     onValue(query(ref(db, 'history'), limitToLast(24)), (sn) => {
         const d = sn.val();

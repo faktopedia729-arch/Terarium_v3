@@ -169,3 +169,8 @@ input[type="number"] {
     .form-group { flex-direction: column; align-items: flex-start; gap: 10px; }
     input[type="range"] { width: 100%; }
 }
+.range-btn {
+    background: #252836; border: 1px solid #444; color: white;
+    padding: 5px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem;
+}
+.range-btn:hover { background: var(--accent); }
