@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦎 Terrarium Control (Firebase)</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css"> 
+</head>
+<body>
+    <div id="login-form" style="text-align: center; margin-top: 50px;">
+        <h2>Status połączenia</h2>
+        <p id="auth-status">Inicjalizacja usług Firebase...</p>
+    </div>
+
+    <div class="container" id="app-container" style="display: none;">
+        <h1>🦎 Inteligentne Terrarium IoT</h1>
+        
+        <div id="notification-bar" class="notification"></div>
+        
+        <section class="status-section">
+            <h2>Status Środowiskowy</h2>
+            <div class="status-grid">
+                <div>
+                    <i class="fas fa-thermometer-half"></i> Temperatura: 
+                    <span id="temperature">N/A</span>°C
+                </div>
+                <div>
+                    <i class="fas fa-tint"></i> Wilgotność: 
+                    <span id="humidity">N/A</span>%
+                </div>
+                <div>
+                    <i class="fas fa-robot"></i> Tryb: 
+                    <span id="autoMode" class="status-pill on">N/A</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="control-section">
+            <h2>Sterowanie Manualne</h2>
+            <p class="small-info">Kontrolki zablokowane w Trybie AUTO.</p>
+            <button id="auto-toggle-btn" class="action-btn auto-toggle">Przełącz na AUTO</button>
+            
+            <div class="manual-controls">
+                <button id="heater-toggle-btn" class="manual-control">Grzanie (<span id="heater-status" class="status-pill off">OFF</span>)</button>
+                <button id="mist-toggle-btn" class="manual-control">Mgiełka (<span id="mist-status" class="status-pill off">OFF</span>)</button>
+                <button id="fan-toggle-btn" class="manual-control">Wentylator (<span id="fan-status" class="status-pill off">OFF</span>)</button>
+                <button id="led-toggle-btn" class="manual-control">LED (<span id="led-status" class="status-pill off">OFF</span>)</button>
+            </div>
+            
+            <h3>Oświetlenie</h3>
+            <div class="led-controls">
+                Jasność: 
+                <input type="range" id="brightness-slider" min="0" max="100" value="100" class="manual-control">
+                Kolor: 
+                <input type="color" id="color-picker" value="#FFFFFF" class="manual-control">
+            </div>
+        </section>
+
+        <section class="settings-section">
+            <h2>Harmonogram i Setpointy (AUTO)</h2>
+            <div class="form-grid">
+                <label>Start (GG:MM):</label>
+                <div>
+                    <input type="number" id="startHour" min="0" max="23" value="9"> : 
+                    <input type="number" id="startMinute" min="0" max="59" value="0">
+                </div>
+                <label>Stop (GG:MM):</label>
+                <div>
+                    <input type="number" id="endHour" min="0" max="23" value="18"> : 
+                    <input type="number" id="endMinute" min="0" max="59" value="0">
+                </div>
+                <button id="save-schedule-btn" class="action-btn save-btn">Zapisz Harmonogram</button>
+                
+                <label>Temp Setpoint (°C):</label>
+                <input type="number" id="temp-setpoint" step="0.1" value="28.0">
+                
+                <label>Wilgotność Min (%):</label>
+                <input type="number" id="hum-min-setpoint" step="0.1" value="65.0">
+                
+                <label>Wilgotność Max (%):</label>
+                <input type="number" id="hum-max-setpoint" step="0.1" value="75.0">
+                
+                <button id="save-setpoints-btn" class="action-btn save-btn">Zapisz Setpointy</button>
+            </div>
+        </section>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>
