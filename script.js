@@ -1,70 +1,84 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, onValue, set, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, onValue, set, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyDpKe0M" + "WMGEIZ8w26ukKkRYwNWnzGa2S60",
+    apiKey: "AIzaSyDpKe0MWMGEIZ8w26ukKkRYwNWnzGa2S60",
     authDomain: "terrarium-v3-21ba4.firebaseapp.com",
     databaseURL: "https://terrarium-v3-21ba4-default-rtdb.europe-west1.firebasedatabase.app",
     projectId: "terrarium-v3-21ba4",
-    storageBucket: "terrarium-v3-21ba4.firebasestorage.app",
-    messagingSenderId: "387514732102",
     appId: "1:387514732102:web:0b5efff0510fe47b690447"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const auth = getAuth(app);
 
-document.getElementById('login-form').style.display = 'none';
-document.getElementById('app-container').style.display = 'block';
+// Logowanie
+document.getElementById('login-btn').onclick = () => {
+    const email = document.getElementById('login-email').value;
+    const pass = document.getElementById('login-password').value;
+    signInWithEmailAndPassword(auth, email, pass).catch(e => alert("Błąd logowania!"));
+};
 
-// ODCZYT CZUJNIKÓW
-onValue(ref(db, 'readings'), (snapshot) => {
-    const data = snapshot.val();
-    if (data) {
-        document.getElementById('temperature').innerText = data.temperature ? data.temperature.toFixed(1) : "N/A";
-        document.getElementById('humidity').innerText = data.humidity ? data.humidity.toFixed(1) : "N/A";
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('app-container').style.display = 'block';
+        initApp();
     }
 });
 
-// NASŁUCHIWANIE I AKTUALIZACJA PRZYCISKÓW NA STRONIE
-onValue(ref(db, 'actuators'), (snapshot) => {
-    const data = snapshot.val();
-    if (data) {
-        updateUI('heater', data.mata);
-        updateUI('mist', data.mglica);
-        updateUI('fan', data.wiatrak);
-        updateUI('led', data.led);
-    }
-});
+function initApp() {
+    onValue(ref(db, 'readings'), (sn) => {
+        const d = sn.val();
+        document.getElementById('temperature').innerText = d.temperature.toFixed(1);
+        document.getElementById('humidity').innerText = d.humidity.toFixed(0);
+    });
 
-function updateUI(device, state) {
-    const el = document.getElementById(`${device}-status`);
-    if (el) {
-        el.innerText = state ? "ON" : "OFF";
-        el.className = `status-pill ${state ? 'on' : 'off'}`;
-    }
+    onValue(ref(db, 'actuators'), (sn) => {
+        const d = sn.val();
+        updateUI('heater-toggle-btn', d.heater);
+        updateUI('mist-toggle-btn', d.mist);
+        updateUI('fan-toggle-btn', d.fan);
+        updateUI('led-toggle-btn', d.led);
+    });
+
+    initChart();
 }
 
-// STEROWANIE
-window.toggleDevice = (firebaseKey) => {
-    const deviceRef = ref(db, `actuators/${firebaseKey}`);
-    onValue(deviceRef, (snapshot) => {
-        const currentState = snapshot.val();
-        set(deviceRef, !currentState);
-    }, { onlyOnce: true });
+function updateUI(id, state) {
+    const btn = document.getElementById(id);
+    state ? btn.classList.add('active') : btn.classList.remove('active');
+}
+
+window.toggleDevice = (key) => {
+    const r = ref(db, `actuators/${key}`);
+    onValue(r, (sn) => { set(r, !sn.val()); }, { onlyOnce: true });
 };
 
-window.saveSetpoints = () => {
-    const t = document.getElementById('temp-setpoint').value;
-    const h = document.getElementById('hum-min-setpoint').value;
-    update(ref(db, 'settings'), {
-        target_t: parseFloat(t),
-        target_h: parseFloat(h)
-    }).then(() => alert("✅ Zapisano!"));
-};
+document.getElementById('heater-toggle-btn').onclick = () => toggleDevice('heater');
+document.getElementById('mist-toggle-btn').onclick = () => toggleDevice('mist');
+document.getElementById('fan-toggle-btn').onclick = () => toggleDevice('fan');
+document.getElementById('led-toggle-btn').onclick = () => toggleDevice('led');
 
-document.getElementById('save-setpoints-btn').onclick = window.saveSetpoints;
-document.getElementById('heater-toggle-btn').onclick = () => window.toggleDevice('mata');
-document.getElementById('mist-toggle-btn').onclick = () => window.toggleDevice('mglica');
-document.getElementById('fan-toggle-btn').onclick = () => window.toggleDevice('wiatrak');
-document.getElementById('led-toggle-btn').onclick = () => window.toggleDevice('led');
+function initChart() {
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: [], datasets: [{ label: 'Temp', borderColor: '#e74c3c', data: [] }, { label: 'Hum', borderColor: '#3498db', data: [] }] },
+        options: { responsive: true, scales: { x: { display: false } } }
+    });
+
+    onValue(query(ref(db, 'history'), limitToLast(24)), (sn) => {
+        const d = sn.val();
+        if (!d) return;
+        chart.data.labels = []; chart.data.datasets[0].data = []; chart.data.datasets[1].data = [];
+        Object.keys(d).forEach(k => {
+            chart.data.labels.push("");
+            chart.data.datasets[0].data.push(d[k].t);
+            chart.data.datasets[1].data.push(d[k].h);
+        });
+        chart.update();
+    });
+}

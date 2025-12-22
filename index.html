@@ -3,75 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🦎 Terrarium Control (Firebase)</title>
+    <title>🦎 Terrarium Pro Control</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css"> 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="login-form" style="text-align: center; margin-top: 50px;">
-        <h2>Status połączenia</h2>
-        <p id="auth-status">Inicjalizacja usług Firebase...</p>
+    <div id="login-form" class="login-overlay">
+        <div class="card login-card">
+            <h2><i class="fas fa-lock"></i> Autoryzacja</h2>
+            <input type="email" id="login-email" placeholder="Email" class="input-field">
+            <input type="password" id="login-password" placeholder="Hasło" class="input-field">
+            <button id="login-btn" class="action-btn">Zaloguj</button>
+            <p id="auth-error" class="error-msg" style="display: none;"></p>
+        </div>
     </div>
 
     <div class="container" id="app-container" style="display: none;">
-        <h1>🦎 Inteligentne Terrarium IoT</h1>
+        <header>
+            <h1>🦎 Inteligentne Terrarium IoT</h1>
+            <div id="notification-bar" class="notification"></div>
+        </header>
         
-        <div id="notification-bar" class="notification"></div>
-        
-        <section class="status-section">
-            <h2>Status Środowiskowy</h2>
-            <div class="status-grid">
-                <div>
-                    <i class="fas fa-thermometer-half"></i> Temperatura: 
-                    <span id="temperature">N/A</span>°C
+        <section class="card status-section">
+            <h2><i class="fas fa-microchip"></i> Status Środowiskowy</h2>
+            <div class="dashboard-grid">
+                <div class="sensor-item">
+                    <i class="fas fa-thermometer-half"></i>
+                    <span class="val"><span id="temperature">--</span>°C</span>
+                    <span class="lab">Temperatura</span>
                 </div>
-                <div>
-                    <i class="fas fa-tint"></i> Wilgotność: 
-                    <span id="humidity">N/A</span>%
+                <div class="sensor-item">
+                    <i class="fas fa-tint"></i>
+                    <span class="val"><span id="humidity">--</span>%</span>
+                    <span class="lab">Wilgotność</span>
                 </div>
-                <div>
+                <div class="sensor-item full-width">
                     <i class="fas fa-robot"></i> Tryb: 
-                    <span id="autoMode" class="status-pill on">N/A</span>
+                    <span id="autoMode" class="status-pill">Ładowanie...</span>
                 </div>
             </div>
         </section>
 
-        <section class="control-section">
-            <h2>Sterowanie Manualne</h2>
-            <p class="small-info">Kontrolki zablokowane w Trybie AUTO.</p>
+        <section class="card control-section">
+            <h2><i class="fas fa-sliders-h"></i> Sterowanie Manualne</h2>
             <button id="auto-toggle-btn" class="action-btn auto-toggle">Przełącz na AUTO</button>
             
-            <div class="manual-controls">
-                <button id="heater-toggle-btn" class="manual-control">Grzanie (<span id="heater-status" class="status-pill off">OFF</span>)</button>
-                <button id="mist-toggle-btn" class="manual-control">Mgiełka (<span id="mist-status" class="status-pill off">OFF</span>)</button>
-                <button id="fan-toggle-btn" class="manual-control">Wentylator (<span id="fan-status" class="status-pill off">OFF</span>)</button>
-                <button id="led-toggle-btn" class="manual-control">LED (<span id="led-status" class="status-pill off">OFF</span>)</button>
+            <div class="button-grid">
+                <button id="heater-toggle-btn" class="device-btn">
+                    <i class="fas fa-fire"></i> Grzanie
+                </button>
+                <button id="mist-toggle-btn" class="device-btn">
+                    <i class="fas fa-cloud-showers-heavy"></i> Mgiełka
+                </button>
+                <button id="fan-toggle-btn" class="device-btn">
+                    <i class="fas fa-wind"></i> Nawiew
+                </button>
+                <button id="led-toggle-btn" class="device-btn">
+                    <i class="fas fa-lightbulb"></i> Światło
+                </button>
             </div>
             
-            <h3>Oświetlenie</h3>
-            <div class="led-controls">
-                Jasność: 
-                <input type="range" id="brightness-slider" min="0" max="100" value="100" class="manual-control">
-                Kolor: 
-                <input type="color" id="color-picker" value="#FFFFFF" class="manual-control">
+            <div class="led-advanced">
+                <h3>Oświetlenie Pro</h3>
+                <div class="led-row">
+                    <span>Jasność:</span>
+                    <input type="range" id="brightness-slider" min="0" max="100" value="100">
+                </div>
+                <div class="led-row">
+                    <span>Kolor:</span>
+                    <input type="color" id="color-picker" value="#FFFFFF">
+                </div>
             </div>
         </section>
 
-        <section class="settings-section">
-            <h2>Harmonogram i Setpointy (AUTO)</h2>
+        <section class="card charts-section">
+            <h2><i class="fas fa-chart-line"></i> Raport 24h</h2>
+            <div class="chart-container">
+                <canvas id="mainChart"></canvas>
+            </div>
+        </section>
+
+        <section class="card settings-section">
+            <h2><i class="fas fa-cog"></i> Harmonogram i Setpointy</h2>
             <div class="form-grid">
-                <label>Start (GG:MM):</label>
-                <div>
-                    <input type="number" id="startHour" min="0" max="23" value="9"> : 
-                    <input type="number" id="startMinute" min="0" max="59" value="0">
+                <div class="form-group">
+                    <label>Start (GG:MM):</label>
+                    <div class="time-inputs">
+                        <input type="number" id="startHour" min="0" max="23" value="9"> : 
+                        <input type="number" id="startMinute" min="0" max="59" value="0">
+                    </div>
                 </div>
-                <label>Stop (GG:MM):</label>
-                <div>
-                    <input type="number" id="endHour" min="0" max="23" value="18"> : 
-                    <input type="number" id="endMinute" min="0" max="59" value="0">
+                <div class="form-group">
+                    <label>Stop (GG:MM):</label>
+                    <div class="time-inputs">
+                        <input type="number" id="endHour" min="0" max="23" value="18"> : 
+                        <input type="number" id="endMinute" min="0" max="59" value="0">
+                    </div>
                 </div>
                 <button id="save-schedule-btn" class="action-btn save-btn">Zapisz Harmonogram</button>
                 
+                <hr>
+
                 <label>Temp Setpoint (°C):</label>
                 <input type="number" id="temp-setpoint" step="0.1" value="28.0">
                 
