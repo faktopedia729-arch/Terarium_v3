@@ -166,16 +166,56 @@ function initChart() {
 
     updateChartRange(20); // Start z 5h
 }
-function updateColor(hex) {
-    // Zamiana formatu #RRGGBB na liczby dziesiętne R, G, B
+// --- NOWA OBSŁUGA OŚWIETLENIA ---
+
+// 1. Obsługa zmiany koloru (zapis do NodeMCU i Firebase)
+window.updateColor = (hex) => {
     const r = parseInt(hex.substring(1, 3), 16);
     const g = parseInt(hex.substring(3, 5), 16);
     const b = parseInt(hex.substring(5, 7), 16);
 
-    console.log("Wysyłam kolor:", r, g, b); // Debugowanie w konsoli przeglądarki
-
-    // Wysyłanie żądania do serwera na NodeMCU
+    // Wysyłamy do serwera lokalnego NodeMCU (szybka reakcja)
     fetch(`/setColor?r=${r}&g=${g}&b=${b}`)
-        .then(response => console.log("Serwer odpowiedział"))
-        .catch(err => console.error("Błąd wysyłania:", err));
+        .then(() => console.log("Kolor wysłany do NodeMCU"))
+        .catch(err => console.error("Błąd wysyłki lokalnej:", err));
+
+    // Zapisujemy do Firebase (synchronizacja stanu)
+    set(ref(db, 'actuators/led_r'), r);
+    set(ref(db, 'actuators/led_g'), g);
+    set(ref(db, 'actuators/led_b'), b);
+    set(ref(db, 'actuators/led_mode'), "static");
+};
+
+// 2. Obsługa trybów animacji
+window.setLedMode = (mode) => {
+    fetch(`/setMode?m=${mode}`)
+        .then(() => {
+            console.log("Tryb zmieniony na:", mode);
+            set(ref(db, 'actuators/led_mode'), mode);
+        });
+};
+
+// 3. Obsługa jasności
+const brightnessSlider = document.getElementById('brightness-slider');
+if (brightnessSlider) {
+    brightnessSlider.oninput = (e) => {
+        const val = parseInt(e.target.value);
+        set(ref(db, 'actuators/brightness'), val);
+    };
 }
+
+// Rozszerzenie funkcji initApp o nasłuchiwanie nowych wartości
+// Dodaj to wewnątrz istniejącej funkcji initApp()
+onValue(ref(db, 'actuators'), (sn) => {
+    const d = sn.val();
+    if (d) {
+        if (d.led_r && d.led_g && d.led_b) {
+            // Konwersja RGB na HEX dla pickera
+            const hex = "#" + ((1 << 24) + (d.led_r << 16) + (d.led_g << 8) + d.led_b).toString(16).slice(1);
+            document.getElementById('color-picker').value = hex;
+        }
+        if (d.brightness) {
+            document.getElementById('brightness-slider').value = d.brightness;
+        }
+    }
+});
