@@ -166,3 +166,16 @@ function initChart() {
 
     updateChartRange(20); // Start z 5h
 }
+function updateColor(hex) {
+    // Zamiana formatu #RRGGBB na liczby dziesiętne R, G, B
+    const r = parseInt(hex.substring(1, 3), 16);
+    const g = parseInt(hex.substring(3, 5), 16);
+    const b = parseInt(hex.substring(5, 7), 16);
+
+    console.log("Wysyłam kolor:", r, g, b); // Debugowanie w konsoli przeglądarki
+
+    // Wysyłanie żądania do serwera na NodeMCU
+    fetch(`/setColor?r=${r}&g=${g}&b=${b}`)
+        .then(response => console.log("Serwer odpowiedział"))
+        .catch(err => console.error("Błąd wysyłania:", err));
+}
