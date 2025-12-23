@@ -4,15 +4,28 @@ import { getDatabase, ref, onValue, set, update, query, limitToLast } from "http
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // KONFIGURACJA (Wklej swoje prawdziwe dane tutaj)
-const firebaseConfig = {
-    apiKey: "AIzaSyDpKe0MWMGEIZ8w26ukKkRYwNWnzGa2S60", // Tu wstaw poprawne API Key
-    authDomain: "terrarium-v3-21ba4.firebaseapp.com",
-    databaseURL: "https://terrarium-v3-21ba4-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "terrarium-v3-21ba4",
-    storageBucket: "terrarium-v3-21ba4.appspot.com",
-    messagingSenderId: "387514732102",
-    appId: "1:387514732102:web:0b5efff0510fe47b690447"
+// Zaimportuj potrzebne funkcje z zestawów SDK, których potrzebujesz
+import { initializeApp } z "firebase/app" ;   
+import { getAnalytics } z "firebase/analytics" ;   
+// TODO: Dodaj zestawy SDK dla produktów Firebase, których chcesz używać
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Konfiguracja Firebase Twojej aplikacji internetowej
+// W przypadku Firebase JS SDK w wersji 7.20.0 i nowszych parametr measurementId jest opcjonalny
+const firebaseConfig = { 
+  apiKey : "AIzaSyDpKe0MWMGEIZ8w26ukKkRYwNWnzGa2S60" , 
+  authDomain : "terrarium-v3-21ba4.firebaseapp.com" , 
+  databaseURL : "https://terrarium-v3-21ba4-default-rtdb.europe-west1.firebasedatabase.app" , 
+  identyfikator projektu : "terrarium-v3-21ba4" , 
+  storageBucket : "terrarium-v3-21ba4.firebasestorage.app" , 
+  messagingSenderId : "387514732102" , 
+  Identyfikator aplikacji : "1:387514732102:web:0b5efff0510fe47b690447" , 
+  MeasurementId : "G-GSY4D9Z3EB" 
 };
+
+// Zainicjuj Firebase
+//const app = initializeApp ( firebaseConfig );
+const analytics = getAnalytics ( aplikacja );
 
 // Inicjalizacja
 const app = initializeApp(firebaseConfig);
