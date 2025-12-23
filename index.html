@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🦎 Terrarium Pro Control</title>
+    <title>🦎 Terrarium Pro Control v3</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="style.css">
@@ -16,14 +16,13 @@
             <input type="email" id="login-email" placeholder="Email" class="input-field">
             <input type="password" id="login-password" placeholder="Hasło" class="input-field">
             <button id="login-btn" class="action-btn">Zaloguj</button>
-            <p id="auth-error" class="error-msg" style="display: none;"></p>
         </div>
     </div>
 
     <div class="container" id="app-container" style="display: none;">
         <header>
             <h1>🦎 Terrarium IoT Pro</h1>
-            <div id="connection-status" class="status-indicator">Inicjalizacja systemu...</div>
+            <div id="connection-status" class="status-indicator">Inicjalizacja...</div>
         </header>
         
         <section class="card dashboard-grid">
@@ -39,35 +38,38 @@
             </div>
         </section>
 
-        <section class="card control-section">
-            <h2><i class="fas fa-sliders-h"></i> Sterowanie Urządzeniami</h2>
-            
+        <section class="card">
+            <h2><i class="fas fa-sliders-h"></i> Urządzenia</h2>
             <div class="button-grid">
                 <button id="heater-toggle-btn" class="device-btn"><i class="fas fa-fire"></i> Grzanie</button>
                 <button id="mist-toggle-btn" class="device-btn"><i class="fas fa-cloud-showers-heavy"></i> Mgiełka</button>
                 <button id="fan-toggle-btn" class="device-btn"><i class="fas fa-wind"></i> Nawiew</button>
                 <button id="led-toggle-btn" class="device-btn"><i class="fas fa-lightbulb"></i> Światło</button>
             </div>
-            
+        </section>
+
+        <section class="card">
+            <h2><i class="fas fa-palette"></i> Kolory i Efekty</h2>
             <div class="led-advanced">
-                <h3>Oświetlenie RGB</h3>
-                
                 <div class="led-row">
-                     <span>Kolor:</span>
-                     <input type="color" id="color-picker" value="#FFFFFF">
+                     <span>Wybierz kolor:</span>
+                     <div style="display: flex; gap: 10px;">
+                        <input type="color" id="color-picker" value="#FFFFFF">
+                        <button id="apply-color-btn" class="action-btn" style="margin:0; padding: 5px 15px; width: auto;">Zastosuj</button>
+                     </div>
                 </div>
 
                 <div class="led-row">
-                    <span>Ostatnie:</span>
+                    <span>Ostatnie kolory:</span>
                     <div id="recent-colors-container" class="recent-colors"></div>
                 </div>
 
-                <h3>Efekty i Atmosfera</h3>
+                <h3>Efekty</h3>
                 <div class="effects-grid">
-                    <button id="btn-mode-static" class="effect-btn" data-mode="static">Stały Kolor</button>
-                    <button id="btn-mode-fire" class="effect-btn" data-mode="fire">🔥 Ognisko</button>
-                    <button id="btn-mode-storm" class="effect-btn" data-mode="storm">⚡ Burza</button>
-                    <button id="btn-mode-sunrise" class="effect-btn" data-mode="sunrise">🌅 Wschód</button>
+                    <button class="effect-btn" data-mode="static">Stały Kolor</button>
+                    <button class="effect-btn" data-mode="fire">🔥 Ognisko</button>
+                    <button class="effect-btn" data-mode="storm">⚡ Burza</button>
+                    <button class="effect-btn" data-mode="sunrise">🌅 Wschód</button>
                 </div>
 
                 <div class="led-row" style="margin-top:20px">
@@ -77,14 +79,15 @@
             </div>
         </section>
 
-                        <section class="card automation-settings">
-            <h2><i class="fas fa-robot"></i> Automatyzacja</h2>
-            <div class="button-grid" style="margin-bottom: 25px;">
+        <section class="card automation-settings">
+            <h2><i class="fas fa-robot"></i> Automatyzacja & Harmonogram</h2>
+            <div class="button-grid" style="margin-bottom: 20px;">
                 <button id="auto-mode-toggle-btn" class="device-btn">
                     <i class="fas fa-robot"></i> Tryb AUTO
                 </button>
             </div>
-            <div class="form-grid" style="display: grid; gap: 15px;">
+
+            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                 <div class="form-group">
                     <label>Temp. Celowa (°C)</label>
                     <input type="number" id="target-temp-input" step="0.5" class="input-field">
@@ -97,22 +100,31 @@
                     <label>Margines Wilg. (+/- %)</label>
                     <input type="number" id="hum-margin-input" step="1" class="input-field">
                 </div>
-                <button id="save-settings-btn" class="action-btn" style="background: #27ae60;">
-                    <i class="fas fa-save"></i> Zapisz Ustawienia
-                </button>
+                <div class="form-group">
+                    <label>LED ON (godzina)</label>
+                    <input type="time" id="led-on-time" class="input-field">
+                </div>
+                <div class="form-group">
+                    <label>LED OFF (godzina)</label>
+                    <input type="time" id="led-off-time" class="input-field">
+                </div>
+                <div class="form-group" style="grid-column: span 2;">
+                    <button id="save-settings-btn" class="action-btn" style="background: #27ae60;">
+                        <i class="fas fa-save"></i> Zapisz Wszystkie Ustawienia
+                    </button>
+                </div>
             </div>
         </section>
 
-
-
-        <section class="card chart-section">
-            <h2><i class="fas fa-chart-line"></i> Historia 24h</h2>
+        <section class="card">
+            <h2><i class="fas fa-chart-line"></i> Wykresy</h2>
             <div class="chart-container">
                 <canvas id="mainChart"></canvas>
             </div>
             <div class="chart-controls">
-                <button class="range-btn" data-points="20">Krótka historia</button>
-                <button class="range-btn" data-points="100">Pełna historia</button>
+                <button class="range-btn" data-points="8">4h</button>
+                <button class="range-btn" data-points="24">12h</button>
+                <button class="range-btn" data-points="48">24h</button>
             </div>
         </section>
     </div>

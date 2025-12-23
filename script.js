@@ -2,34 +2,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getDatabase, ref, onValue, set, update, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// Funkcja, która uruchomi się dopiero gdy strona się wczyta
-window.addEventListener('DOMContentLoaded', () => {
-    const loginBtn = document.getElementById('login-btn');
-    
-    if (loginBtn) {
-        console.log("System gotowy, przycisk logowania znaleziony.");
-
-        loginBtn.addEventListener('click', (e) => {
-            e.preventDefault(); // Zapobiega przeładowaniu strony
-            
-            const email = document.getElementById('login-email').value;
-            const pass = document.getElementById('login-password').value;
-
-            console.log("Próba logowania dla:", email);
-
-            signInWithEmailAndPassword(auth, email, pass)
-                .then((userCredential) => {
-                    console.log("Zalogowano pomyślnie!");
-                })
-                .catch((error) => {
-                    console.error("Błąd Firebase:", error.code, error.message);
-                    alert("Błąd: " + error.message);
-                });
-        });
-    } else {
-        console.error("Nie znaleziono przycisku o ID 'login-btn'!");
-    }
-});
 // --- KONFIGURACJA ---
 const firebaseConfig = {
     apiKey: "AIzaSyDpKe0MWMGEIZ8w26ukKkRYwNWnzGa2S60",
@@ -43,40 +15,48 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// --- OBSŁUGA LOGOWANIA ---
-const loginBtn = document.getElementById('login-btn');
-if (loginBtn) {
-    loginBtn.onclick = () => {
-        const email = document.getElementById('login-email').value;
-        const pass = document.getElementById('login-password').value;
-        signInWithEmailAndPassword(auth, email, pass).catch(e => alert("Błąd: " + e.message));
-    };
-}
-
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        document.getElementById('login-form').style.display = 'none';
-        document.getElementById('app-container').style.display = 'block';
-        initApp();
-    } else {
-        document.getElementById('login-form').style.display = 'flex';
-        document.getElementById('app-container').style.display = 'none';
+// --- BEZPIECZNY START (DOMContentLoaded) ---
+window.addEventListener('DOMContentLoaded', () => {
+    const loginBtn = document.getElementById('login-btn');
+    if (loginBtn) {
+        loginBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-password').value;
+            signInWithEmailAndPassword(auth, email, pass)
+                .then(() => console.log("Zalogowano!"))
+                .catch(error => alert("Błąd logowania: " + error.message));
+        });
     }
 });
 
-// --- GŁÓWNA LOGIKA APLIKACJI ---
+// --- STAN AUTORYZACJI ---
+onAuthStateChanged(auth, (user) => {
+    const loginForm = document.getElementById('login-form');
+    const appContainer = document.getElementById('app-container');
+    if (user) {
+        if(loginForm) loginForm.style.display = 'none';
+        if(appContainer) appContainer.style.display = 'block';
+        initApp();
+    } else {
+        if(loginForm) loginForm.style.display = 'flex';
+        if(appContainer) appContainer.style.display = 'none';
+    }
+});
+
+// --- GŁÓWNA APLIKACJA ---
 function initApp() {
-    // 1. Nasłuchiwanie czujników (Dashboard)
+    // 1. Czujniki
     onValue(ref(db, 'readings'), (sn) => {
         const d = sn.val();
         if (d) {
             document.getElementById('temperature').innerText = d.temperature.toFixed(1);
             document.getElementById('humidity').innerText = d.humidity.toFixed(0);
-            document.getElementById('connection-status').innerText = "Ostatnia aktualizacja: " + (d.last_sync || "teraz");
+            document.getElementById('connection-status').innerText = "Aktualizacja: " + (d.last_sync || "teraz");
         }
     });
 
-    // 2. Nasłuchiwanie stanów urządzeń (Synchronizacja przycisków i suwaków)
+    // 2. Aktuatory (Urządzenia i LED)
     onValue(ref(db, 'actuators'), (sn) => {
         const d = sn.val();
         if (d) {
@@ -84,20 +64,29 @@ function initApp() {
             updateToggleButton('mist-toggle-btn', d.mist);
             updateToggleButton('fan-toggle-btn', d.fan);
             updateToggleButton('led-toggle-btn', d.led);
+            document.getElementById('brightness-slider').value = d.brightness || 255;
             
-            // Kolor i jasność
+            // Ustaw kolor w pickerze jeśli przyszedł z bazy
             if (d.led_r !== undefined) {
-                const hex = rgbToHex(d.led_r, d.led_g, d.led_b);
-                document.getElementById('color-picker').value = hex;
+                document.getElementById('color-picker').value = rgbToHex(d.led_r, d.led_g, d.led_b);
             }
-            if (d.brightness !== undefined) {
-                document.getElementById('brightness-slider').value = d.brightness;
-            }
-            
-            // Zaznaczenie aktywnego trybu LED
+
             document.querySelectorAll('.effect-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.getAttribute('data-mode') === d.led_mode);
             });
+        }
+    });
+
+    // 3. Ustawienia (Harmonogram i Cele) - zapobiega znikaniu danych
+    onValue(ref(db, 'settings'), (sn) => {
+        const s = sn.val();
+        if (s) {
+            document.getElementById('target-temp-input').value = s.target_temp || 28;
+            document.getElementById('target-hum-input').value = s.target_hum || 60;
+            document.getElementById('hum-margin-input').value = s.hum_margin || 5;
+            document.getElementById('led-on-time').value = s.led_on || "08:00";
+            document.getElementById('led-off-time').value = s.led_off || "20:00";
+            updateToggleButton('auto-mode-toggle-btn', s.auto_enabled);
         }
     });
 
@@ -105,53 +94,64 @@ function initApp() {
     renderRecentColors();
 }
 
-// --- FUNKCJE STERUJĄCE ---
+// --- STEROWANIE ---
 
-// Przełączanie urządzeń (On/Off)
-const toggleDevice = (key) => {
-    const r = ref(db, `actuators/${key}`);
-    // Pobieramy aktualny stan raz i wysyłamy przeciwny
+// Uniwersalny przełącznik ON/OFF
+const toggleFirebase = (path) => {
+    const r = ref(db, path);
     onValue(r, (sn) => {
         set(r, !sn.val());
     }, { onlyOnce: true });
 };
 
-// Obsługa przycisków w gridzie
-document.getElementById('heater-toggle-btn').onclick = () => toggleDevice('heater');
-document.getElementById('mist-toggle-btn').onclick = () => toggleDevice('mist');
-document.getElementById('fan-toggle-btn').onclick = () => toggleDevice('fan');
-document.getElementById('led-toggle-btn').onclick = () => toggleDevice('led');
+document.getElementById('heater-toggle-btn').onclick = () => toggleFirebase('actuators/heater');
+document.getElementById('mist-toggle-btn').onclick = () => toggleFirebase('actuators/mist');
+document.getElementById('fan-toggle-btn').onclick = () => toggleFirebase('actuators/fan');
+document.getElementById('led-toggle-btn').onclick = () => toggleFirebase('actuators/led');
+document.getElementById('auto-mode-toggle-btn').onclick = () => toggleFirebase('settings/auto_enabled');
 
-// Zmiana koloru LED
+// Kolory
+document.getElementById('apply-color-btn').onclick = () => {
+    const hex = document.getElementById('color-picker').value;
+    updateColor(hex);
+};
+
 window.updateColor = (hex) => {
     const r = parseInt(hex.substring(1, 3), 16);
     const g = parseInt(hex.substring(3, 5), 16);
     const b = parseInt(hex.substring(5, 7), 16);
 
     update(ref(db, 'actuators'), {
-        led_r: r,
-        led_g: g,
-        led_b: b,
-        led_mode: 'static'
+        led_r: r, led_g: g, led_b: b, led_mode: 'static'
     });
     saveRecentColor(hex);
 };
 
-// Zmiana trybu LED
-document.querySelectorAll('.effect-btn').forEach(btn => {
-    btn.onclick = () => {
-        const mode = btn.getAttribute('data-mode');
-        update(ref(db, 'actuators'), { led_mode: mode });
-    };
-});
-
-// Suwak jasności
+// Jasność i Tryby
 document.getElementById('brightness-slider').oninput = (e) => {
     set(ref(db, 'actuators/brightness'), parseInt(e.target.value));
 };
 
-// --- POMOCNICZE ---
+document.querySelectorAll('.effect-btn').forEach(btn => {
+    btn.onclick = () => {
+        const mode = btn.getAttribute('data-mode');
+        set(ref(db, 'actuators/led_mode'), mode);
+    };
+});
 
+// Zapis ustawień (wszystkie pola naraz)
+document.getElementById('save-settings-btn').onclick = () => {
+    const updates = {
+        target_temp: parseFloat(document.getElementById('target-temp-input').value),
+        target_hum: parseFloat(document.getElementById('target-hum-input').value),
+        hum_margin: parseFloat(document.getElementById('hum-margin-input').value),
+        led_on: document.getElementById('led-on-time').value,
+        led_off: document.getElementById('led-off-time').value
+    };
+    update(ref(db, 'settings'), updates).then(() => alert("Ustawienia zapisane!"));
+};
+
+// --- FUNKCJE POMOCNICZE ---
 function updateToggleButton(id, state) {
     const btn = document.getElementById(id);
     if (btn) btn.classList.toggle('active', state === true);
@@ -165,7 +165,7 @@ function saveRecentColor(hex) {
     let colors = JSON.parse(localStorage.getItem('recentColors') || '[]');
     if (!colors.includes(hex)) {
         colors.unshift(hex);
-        if (colors.length > 5) colors.pop();
+        if (colors.length > 3) colors.pop();
         localStorage.setItem('recentColors', JSON.stringify(colors));
         renderRecentColors();
     }
@@ -174,6 +174,7 @@ function saveRecentColor(hex) {
 function renderRecentColors() {
     const container = document.getElementById('recent-colors-container');
     const colors = JSON.parse(localStorage.getItem('recentColors') || '[]');
+    if(!container) return;
     container.innerHTML = '';
     colors.forEach(hex => {
         const div = document.createElement('div');
@@ -184,26 +185,24 @@ function renderRecentColors() {
     });
 }
 
-// --- WYKRESY (Chart.js) ---
+// --- WYKRESY ---
 let mainChart;
 function initChart() {
-    const ctx = document.getElementById('mainChart').getContext('2d');
+    const canvas = document.getElementById('mainChart');
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
     mainChart = new Chart(ctx, {
         type: 'line',
         data: { labels: [], datasets: [
-            { label: 'Temp (°C)', borderColor: '#ff3b30', data: [], yAxisID: 'y', tension: 0.4 },
-            { label: 'Wilg (%)', borderColor: '#007aff', data: [], yAxisID: 'y1', tension: 0.4 }
+            { label: 'Temp (°C)', borderColor: '#ff3b30', data: [], yAxisID: 'y', tension: 0.3 },
+            { label: 'Wilg (%)', borderColor: '#007aff', data: [], yAxisID: 'y1', tension: 0.3 }
         ]},
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { type: 'linear', position: 'left' },
-                y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } }
-            }
+            responsive: true, maintainAspectRatio: false,
+            scales: { y: { position: 'left' }, y1: { position: 'right', grid: { drawOnChartArea: false } } }
         }
     });
-    updateChartRange(20);
+    updateChartRange(8); // Start 4h (zakładając log co 30min)
 }
 
 window.updateChartRange = (points) => {
@@ -225,25 +224,6 @@ window.updateChartRange = (points) => {
     });
 };
 
-// Obsługa przycisków zakresu wykresu
 document.querySelectorAll('.range-btn').forEach(btn => {
     btn.onclick = () => updateChartRange(parseInt(btn.getAttribute('data-points')));
 });
-
-// Obsługa przycisku AUTO
-document.getElementById('auto-mode-toggle-btn').onclick = () => {
-    const r = ref(db, 'settings/auto_enabled');
-    onValue(r, (sn) => {
-        set(r, !sn.val());
-    }, { onlyOnce: true });
-};
-
-// Obsługa przycisku Zapisz
-document.getElementById('save-settings-btn').onclick = () => {
-    const updates = {
-        target_temp: parseFloat(document.getElementById('target-temp-input').value),
-        target_hum: parseFloat(document.getElementById('target-hum-input').value),
-        hum_margin: parseFloat(document.getElementById('hum-margin-input').value)
-    };
-    update(ref(db, 'settings'), updates).then(() => alert("Zapisano!"));
-};
