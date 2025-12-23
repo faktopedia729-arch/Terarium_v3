@@ -3,88 +3,307 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🦎 Terrarium Pro Control</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="style.css">
+    <title>🦎 Terrarium IoT Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    
     <style>
-        /* Dodatkowe style dla nowych funkcji */
-        .recent-colors { display: flex; gap: 10px; margin-top: 10px; }
-        .color-circle { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #444; cursor: pointer; }
-        .effects-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .effect-btn { padding: 10px; border: none; border-radius: 8px; background: #333; color: white; cursor: pointer; transition: 0.3s; }
-        .effect-btn:hover { background: #555; }
-        .effect-btn.active { background: #ff9800; color: black; font-weight: bold; }
+        :root { --bg-color: #121212; --card-bg: #1e1e1e; --primary: #00e676; --accent: #2979ff; --text: #e0e0e0; }
+        body { background-color: var(--bg-color); color: var(--text); font-family: 'Roboto', sans-serif; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { max-width: 500px; width: 100%; }
+        
+        /* Karty */
+        .card { background: var(--card-bg); border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        h1, h2, h3 { text-align: center; margin-top: 0; }
+        
+        /* Logowanie */
+        .login-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: #000; z-index: 999; display: flex; justify-content: center; align-items: center; }
+        .input-field { width: 90%; padding: 12px; margin: 10px 0; background: #333; border: 1px solid #444; color: white; border-radius: 5px; }
+        
+        /* Przyciski Główne */
+        .button-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .device-btn { padding: 20px; font-size: 16px; border: none; border-radius: 12px; background: #333; color: #888; cursor: pointer; transition: 0.3s; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .device-btn i { font-size: 24px; }
+        
+        /* Stany przycisków */
+        .device-btn.active { background: rgba(0, 230, 118, 0.15); color: var(--primary); border: 1px solid var(--primary); }
+        .device-btn.active i { text-shadow: 0 0 10px var(--primary); }
+
+        /* LED Controls */
+        .led-section { margin-top: 20px; border-top: 1px solid #333; padding-top: 20px; }
+        input[type="color"] { width: 100%; height: 50px; border: none; background: none; cursor: pointer; }
+        .effects-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 15px; }
+        .effect-btn { padding: 8px; background: #333; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+        .effect-btn.active { background: var(--accent); color: white; }
+        
+        .recent-colors { display: flex; gap: 10px; justify-content: center; margin: 10px 0; }
+        .color-circle { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid #555; }
+
+        /* Sensory */
+        .sensors { display: flex; justify-content: space-around; text-align: center; margin-bottom: 10px; }
+        .sensor-box { width: 45%; background: #252525; padding: 15px; border-radius: 10px; }
+        .sensor-val { font-size: 2em; font-weight: bold; }
+        .temp { color: #ff5252; } .hum { color: #40c4ff; }
+        
+        .action-btn { width: 100%; padding: 12px; background: var(--primary); color: black; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .action-btn:hover { opacity: 0.9; }
     </style>
 </head>
 <body>
+
     <div id="login-form" class="login-overlay">
-        <div class="card login-card">
-            <h2><i class="fas fa-lock"></i> Autoryzacja</h2>
+        <div class="card login-card" style="width: 300px;">
+            <h2><i class="fas fa-lock"></i> Terrarium Login</h2>
             <input type="email" id="login-email" placeholder="Email" class="input-field">
             <input type="password" id="login-password" placeholder="Hasło" class="input-field">
             <button id="login-btn" class="action-btn">Zaloguj</button>
-            <p id="auth-error" class="error-msg" style="display: none;"></p>
+            <p id="auth-error" style="color: red; text-align: center; display: none;"></p>
         </div>
     </div>
 
     <div class="container" id="app-container" style="display: none;">
-        <header>
-            <h1>🦎 Inteligentne Terrarium IoT</h1>
-            <div id="notification-bar" class="notification"></div>
-        </header>
         
-        <section class="card control-section">
-            <h2><i class="fas fa-sliders-h"></i> Sterowanie Manualne</h2>
-            <button id="auto-toggle-btn" class="action-btn auto-toggle">Przełącz na AUTO</button>
-            
-            <div class="button-grid">
-                <button id="heater-toggle-btn" class="device-btn"><i class="fas fa-fire"></i> Grzanie</button>
-                <button id="mist-toggle-btn" class="device-btn"><i class="fas fa-cloud-showers-heavy"></i> Mgiełka</button>
-                <button id="fan-toggle-btn" class="device-btn"><i class="fas fa-wind"></i> Nawiew</button>
-                <button id="led-toggle-btn" class="device-btn"><i class="fas fa-lightbulb"></i> Światło</button>
+        <section class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Status</h2>
+                <button id="logout-btn" style="background:none; border:none; color:#666; cursor:pointer;"><i class="fas fa-sign-out-alt"></i></button>
             </div>
             
-            <div class="led-advanced">
-                <h3>Oświetlenie Pro</h3>
-                
-                <div class="led-row">
-                     <span>Kolor:</span>
-                     <input type="color" id="color-picker" value="#FFFFFF" onchange="handleColorChange(this.value)">
+            <div class="sensors">
+                <div class="sensor-box">
+                    <i class="fas fa-thermometer-half temp"></i>
+                    <div id="val-temp" class="sensor-val temp">--</div>
+                    <div>°C</div>
                 </div>
-
-                <div class="led-row">
-                    <span>Ostatnie:</span>
-                    <div id="recent-colors-container" class="recent-colors">
-                        </div>
+                <div class="sensor-box">
+                    <i class="fas fa-tint hum"></i>
+                    <div id="val-hum" class="sensor-val hum">--</div>
+                    <div>%</div>
                 </div>
-
-                <h3>Efekty i Atmosfera</h3>
-                <div class="effects-grid">
-                    <button class="effect-btn" onclick="setLedMode('static')">Stały Kolor</button>
-                    <button class="effect-btn" onclick="setLedMode('fire')">🔥 Ognisko</button>
-                    <button class="effect-btn" onclick="setLedMode('storm')">⚡ Burza</button>
-                    <button class="effect-btn" onclick="setLedMode('sunrise')">🌅 Wschód</button>
-                </div>
-
-                <div class="led-row" style="margin-top:20px">
-                    <span>Jasność:</span>
-                    <input type="range" id="brightness-slider" min="0" max="255" value="255">
-                </div>
+            </div>
+            <div style="text-align: center; color: #666; font-size: 0.8em;">
+                Ostatnia aktualizacja: <span id="last-update">--:--:--</span>
             </div>
         </section>
 
-        </div>
+        <section class="card control-section">
+            <h2><i class="fas fa-sliders-h"></i> Sterowanie</h2>
+            
+            <div style="display: flex; align-items: center; justify-content: space-between; background: #252525; padding: 10px; border-radius: 8px;">
+                <span>Tryb Automatyczny</span>
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <span id="auto-status-text">OFF</span>
+                    <i id="auto-icon" class="fas fa-robot" style="color: #555;"></i>
+                </label>
+            </div>
+
+            <div class="button-grid">
+                <button id="btn-heater" class="device-btn" onclick="toggleDevice('heater')">
+                    <i class="fas fa-fire"></i> Mata
+                </button>
+                <button id="btn-mist" class="device-btn" onclick="toggleDevice('mist')">
+                    <i class="fas fa-cloud-showers-heavy"></i> Mgiełka
+                </button>
+                <button id="btn-fan" class="device-btn" onclick="toggleDevice('fan')">
+                    <i class="fas fa-wind"></i> Wentylator
+                </button>
+                <button id="btn-led" class="device-btn" onclick="toggleDevice('led')">
+                    <i class="fas fa-lightbulb"></i> LED ON/OFF
+                </button>
+            </div>
+            
+            <div class="led-section">
+                <h3>Oświetlenie RGB</h3>
+                <input type="color" id="color-picker" value="#ffaa00">
+                
+                <div id="recent-colors-container" class="recent-colors"></div>
+
+                <div class="effects-grid">
+                    <button class="effect-btn" onclick="setLedMode('static')">Statyczny</button>
+                    <button class="effect-btn" onclick="setLedMode('fire')">🔥 Ogień</button>
+                    <button class="effect-btn" onclick="setLedMode('storm')">⚡ Burza</button>
+                    <button class="effect-btn" onclick="setLedMode('sunrise')">🌅 Świt</button>
+                </div>
+
+                <div style="margin-top: 15px;">
+                    <label>Jasność</label>
+                    <input type="range" id="brightness-slider" min="0" max="255" style="width: 100%;">
+                </div>
+            </div>
+        </section>
+    </div>
 
     <script type="module">
-        // --- LOGIKA JS DLA NOWYCH FUNKCJI ---
+        // 1. IMPORTY FIREBASE (Wersja Modularna v9+)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, set, update, onValue } 
+               from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
+               from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+
+        // 2. KONFIGURACJA (Wklej dane ze swojej konsoli Firebase)
+        const firebaseConfig = {
+            apiKey: "TU_WPISZ_API_KEY",
+            authDomain: "terrarium-v3.firebaseapp.com",
+            databaseURL: "https://terrarium-v3-21ba4-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "terrarium-v3",
+            storageBucket: "terrarium-v3.appspot.com",
+            messagingSenderId: "TWOJE_ID",
+            appId: "TWOJE_APP_ID"
+        };
+
+        // Inicjalizacja
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+
+        // Zmienne stanu lokalnego (aby nie migać UI)
+        let currentStates = { heater: false, mist: false, fan: false, led: false };
+
+        // --- OBSŁUGA LOGOWANIA ---
+        const loginForm = document.getElementById('login-form');
+        const appContainer = document.getElementById('app-container');
+
+        document.getElementById('login-btn').addEventListener('click', () => {
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-password').value;
+            signInWithEmailAndPassword(auth, email, pass)
+                .catch(error => {
+                    document.getElementById('auth-error').innerText = "Błąd: " + error.message;
+                    document.getElementById('auth-error').style.display = 'block';
+                });
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                loginForm.style.display = 'none';
+                appContainer.style.display = 'block';
+                startListening(); // Rozpocznij pobieranie danych dopiero po zalogowaniu
+            } else {
+                loginForm.style.display = 'flex';
+                appContainer.style.display = 'none';
+            }
+        });
+
+        // --- LOGIKA BAZY DANYCH ---
+
+        function startListening() {
+            // 1. Nasłuchiwanie sensorów (Readings)
+            const readingsRef = ref(db, 'readings');
+            onValue(readingsRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    document.getElementById('val-temp').innerText = data.temperature ? data.temperature.toFixed(1) : '--';
+                    document.getElementById('val-hum').innerText = data.humidity ? data.humidity.toFixed(0) : '--';
+                    
+                    const now = new Date();
+                    document.getElementById('last-update').innerText = now.toLocaleTimeString();
+                }
+            });
+
+            // 2. Nasłuchiwanie stanów urządzeń (Actuators) - synchronizacja przycisków
+            const actuatorsRef = ref(db, 'actuators');
+            onValue(actuatorsRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    currentStates = data; // Aktualizuj lokalny stan
+                    updateButtonState('btn-heater', data.heater);
+                    updateButtonState('btn-mist', data.mist);
+                    updateButtonState('btn-fan', data.fan);
+                    updateButtonState('btn-led', data.led);
+                    
+                    // Tryb Auto
+                    const autoStatus = document.getElementById('auto-status-text');
+                    const autoIcon = document.getElementById('auto-icon');
+                    if(data.auto_mode) {
+                        autoStatus.innerText = "ON"; autoStatus.style.color = "#00e676";
+                        autoIcon.style.color = "#00e676";
+                    } else {
+                        autoStatus.innerText = "OFF"; autoStatus.style.color = "#666";
+                        autoIcon.style.color = "#666";
+                    }
+
+                    // Synchronizacja suwaka jasności jeśli zmienił go ktoś inny
+                    document.getElementById('brightness-slider').value = data.brightness || 255;
+                    
+                    // Zaznaczanie aktywnego trybu LED
+                    document.querySelectorAll('.effect-btn').forEach(btn => btn.classList.remove('active'));
+                    // Znajdź przycisk odpowiadający trybowi i dodaj klasę active (proste dopasowanie po tekście onklick byłoby trudne, lepiej po ID, ale tu uprościmy)
+                }
+            });
+        }
+
+        function updateButtonState(btnId, state) {
+            const btn = document.getElementById(btnId);
+            if (state) btn.classList.add('active');
+            else btn.classList.remove('active');
+        }
+
+        // --- FUNKCJE STERUJĄCE (Eksportowane do window, by działały w HTML onclick) ---
+
+        window.toggleDevice = function(device) {
+            // Odwracamy stan na podstawie tego co mamy w pamięci
+            const newState = !currentStates[device];
+            // Jeśli sterujemy ręcznie, warto wyłączyć tryb auto (opcjonalnie)
+            const updates = {};
+            updates['actuators/' + device] = newState;
+            // updates['actuators/auto_mode'] = false; // Odkomentuj jeśli chcesz by kliknięcie wyłączało automat
+            
+            update(ref(db), updates);
+        };
+
+        window.setLedMode = function(mode) {
+            update(ref(db, 'actuators'), {
+                led_mode: mode,
+                led: true // Włącz LED jeśli zmieniamy tryb
+            });
+            
+            // Wizualna aktualizacja przycisków (dla natychmiastowej reakcji UX)
+            document.querySelectorAll('.effect-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        };
+
+        // --- KOLORY ---
         
-        // Zapisywanie 3 ostatnich kolorów w LocalStorage
+        // Funkcja pomocnicza Hex -> RGB
+        function hexToRgb(hex) {
+            const r = parseInt(hex.substring(1, 3), 16);
+            const g = parseInt(hex.substring(3, 5), 16);
+            const b = parseInt(hex.substring(5, 7), 16);
+            return { r, g, b };
+        }
+
+        const colorPicker = document.getElementById('color-picker');
+        
+        // Używamy zdarzenia 'change' (puszczenie myszki), żeby nie spamować bazy przy przesuwaniu
+        colorPicker.addEventListener('change', (e) => {
+            const hex = e.target.value;
+            const rgb = hexToRgb(hex);
+            
+            saveRecentColor(hex);
+            
+            update(ref(db, 'actuators'), {
+                led_r: rgb.r,
+                led_g: rgb.g,
+                led_b: rgb.b,
+                led_mode: 'static', // Przełącz na statyczny przy zmianie koloru
+                led: true
+            });
+        });
+
+        const brightSlider = document.getElementById('brightness-slider');
+        brightSlider.addEventListener('change', (e) => {
+            set(ref(db, 'actuators/brightness'), parseInt(e.target.value));
+        });
+
+        // --- HISTORIA KOLORÓW (LocalStorage) ---
         function saveRecentColor(hex) {
             let colors = JSON.parse(localStorage.getItem('recentColors') || '[]');
             if (!colors.includes(hex)) {
                 colors.unshift(hex);
-                if (colors.length > 3) colors.pop();
+                if (colors.length > 5) colors.pop();
                 localStorage.setItem('recentColors', JSON.stringify(colors));
                 renderRecentColors();
             }
@@ -99,41 +318,17 @@
                 div.className = 'color-circle';
                 div.style.backgroundColor = hex;
                 div.onclick = () => {
-                    document.getElementById('color-picker').value = hex;
-                    handleColorChange(hex);
+                    colorPicker.value = hex;
+                    // Wywołaj zdarzenie change ręcznie
+                    colorPicker.dispatchEvent(new Event('change'));
                 };
                 container.appendChild(div);
             });
         }
 
-        // Funkcja wysyłająca kolor do NodeMCU
-        window.handleColorChange = function(hex) {
-            const r = parseInt(hex.substring(1, 3), 16);
-            const g = parseInt(hex.substring(3, 5), 16);
-            const b = parseInt(hex.substring(5, 7), 16);
-            
-            saveRecentColor(hex);
-            
-            // Wysyłka do lokalnego serwera NodeMCU
-            fetch(`/setColor?r=${r}&g=${g}&b=${b}`)
-                .then(() => console.log("Kolor wysłany: ", hex))
-                .catch(err => console.error("Błąd połączenia z NodeMCU"));
-        }
+        // Render przy starcie
+        renderRecentColors();
 
-        // Funkcja zmieniająca tryb (mode)
-        window.setLedMode = function(mode) {
-            fetch(`/setMode?m=${mode}`)
-                .then(() => {
-                    // Wizualne zaznaczenie aktywnego przycisku
-                    document.querySelectorAll('.effect-btn').forEach(btn => btn.classList.remove('active'));
-                    event.target.classList.add('active');
-                });
-        }
-
-        // Inicjalizacja przy starcie
-        window.onload = () => {
-            renderRecentColors();
-        };
     </script>
 </body>
 </html>
