@@ -22,7 +22,7 @@
     <div class="container" id="app-container" style="display: none;">
         <header>
             <h1>🦎 Terrarium IoT Pro</h1>
-            <div id="connection-status" class="status-indicator">Inicjalizacja...</div>
+            <div id="connection-status" class="status-indicator">Inicjalizacja systemu...</div>
         </header>
         
         <section class="card dashboard-grid">
@@ -39,7 +39,7 @@
         </section>
 
         <section class="card">
-            <h2><i class="fas fa-sliders-h"></i> Urządzenia</h2>
+            <h2><i class="fas fa-sliders-h"></i> Urządzenia Wykonawcze</h2>
             <div class="button-grid">
                 <button id="heater-toggle-btn" class="device-btn"><i class="fas fa-fire"></i> Grzanie</button>
                 <button id="mist-toggle-btn" class="device-btn"><i class="fas fa-cloud-showers-heavy"></i> Mgiełka</button>
@@ -49,22 +49,23 @@
         </section>
 
         <section class="card">
-            <h2><i class="fas fa-palette"></i> Kolory i Efekty</h2>
+            <h2><i class="fas fa-palette"></i> Zaawansowane Oświetlenie</h2>
             <div class="led-advanced">
                 <div class="led-row">
                      <span>Wybierz kolor:</span>
-                     <div style="display: flex; gap: 10px;">
+                     <div style="display: flex; gap: 10px; align-items: center;">
                         <input type="color" id="color-picker" value="#FFFFFF">
-                        <button id="apply-color-btn" class="action-btn" style="margin:0; padding: 5px 15px; width: auto;">Zastosuj</button>
+                        <button id="apply-color-btn" class="action-btn" style="margin:0; width: auto; padding: 8px 15px; font-size: 0.9rem;">Zastosuj</button>
                      </div>
                 </div>
 
                 <div class="led-row">
                     <span>Ostatnie kolory:</span>
-                    <div id="recent-colors-container" class="recent-colors"></div>
+                    <div id="recent-colors-container" class="recent-colors">
+                        </div>
                 </div>
 
-                <h3>Efekty</h3>
+                <h3>Efekty Dynamiczne</h3>
                 <div class="effects-grid">
                     <button class="effect-btn" data-mode="static">Stały Kolor</button>
                     <button class="effect-btn" data-mode="fire">🔥 Ognisko</button>
@@ -73,7 +74,7 @@
                 </div>
 
                 <div class="led-row" style="margin-top:20px">
-                    <span>Jasność:</span>
+                    <span>Jasność całkowita:</span>
                     <input type="range" id="brightness-slider" min="0" max="255" value="255">
                 </div>
             </div>
@@ -81,50 +82,50 @@
 
         <section class="card automation-settings">
             <h2><i class="fas fa-robot"></i> Automatyzacja & Harmonogram</h2>
-            <div class="button-grid" style="margin-bottom: 20px;">
+            <div class="button-grid" style="margin-bottom: 25px;">
                 <button id="auto-mode-toggle-btn" class="device-btn">
                     <i class="fas fa-robot"></i> Tryb AUTO
                 </button>
             </div>
 
-            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
                 <div class="form-group">
-                    <label>Temp. Celowa (°C)</label>
-                    <input type="number" id="target-temp-input" step="0.5" class="input-field">
+                    <label>Temperatura Celowa (°C)</label>
+                    <input type="number" id="target-temp-input" step="0.5" class="input-field" placeholder="np. 28.0">
                 </div>
                 <div class="form-group">
-                    <label>Wilg. Celowa (%)</label>
-                    <input type="number" id="target-hum-input" step="1" class="input-field">
+                    <label>Wilgotność Celowa (%)</label>
+                    <input type="number" id="target-hum-input" step="1" class="input-field" placeholder="np. 65">
                 </div>
                 <div class="form-group">
-                    <label>Margines Wilg. (+/- %)</label>
-                    <input type="number" id="hum-margin-input" step="1" class="input-field">
+                    <label>Margines Wilgotności (+/- %)</label>
+                    <input type="number" id="hum-margin-input" step="1" class="input-field" placeholder="np. 5">
                 </div>
                 <div class="form-group">
-                    <label>LED ON (godzina)</label>
+                    <label>Włączenie LED (godz:min)</label>
                     <input type="time" id="led-on-time" class="input-field">
                 </div>
                 <div class="form-group">
-                    <label>LED OFF (godzina)</label>
+                    <label>Wyłączenie LED (godz:min)</label>
                     <input type="time" id="led-off-time" class="input-field">
                 </div>
-                <div class="form-group" style="grid-column: span 2;">
-                    <button id="save-settings-btn" class="action-btn" style="background: #27ae60;">
-                        <i class="fas fa-save"></i> Zapisz Wszystkie Ustawienia
+                <div class="form-group" style="grid-column: 1 / -1;">
+                    <button id="save-settings-btn" class="action-btn" style="background: #27ae60; margin-top: 10px;">
+                        <i class="fas fa-save"></i> ZAPISZ WSZYSTKIE USTAWIENIA
                     </button>
                 </div>
             </div>
         </section>
 
         <section class="card">
-            <h2><i class="fas fa-chart-line"></i> Wykresy</h2>
+            <h2><i class="fas fa-chart-line"></i> Wykresy Historyczne</h2>
             <div class="chart-container">
                 <canvas id="mainChart"></canvas>
             </div>
             <div class="chart-controls">
-                <button class="range-btn" data-points="8">4h</button>
-                <button class="range-btn" data-points="24">12h</button>
-                <button class="range-btn" data-points="48">24h</button>
+                <button class="range-btn" data-points="24">Podgląd 4h</button>
+                <button class="range-btn" data-points="72">Podgląd 12h</button>
+                <button class="range-btn" data-points="144">Podgląd 24h</button>
             </div>
         </section>
     </div>

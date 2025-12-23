@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getDatabase, ref, onValue, set, update, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// --- KONFIGURACJA ---
+// --- KONFIGURACJA FIREBASE ---
 const firebaseConfig = {
     apiKey: "AIzaSyDpKe0MWMGEIZ8w26ukKkRYwNWnzGa2S60",
     authDomain: "terrarium-v3-21ba4.firebaseapp.com",
@@ -15,7 +15,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// --- BEZPIECZNY START (DOMContentLoaded) ---
+// --- OBSŁUGA LOGOWANIA I STARTU ---
 window.addEventListener('DOMContentLoaded', () => {
     const loginBtn = document.getElementById('login-btn');
     if (loginBtn) {
@@ -24,13 +24,12 @@ window.addEventListener('DOMContentLoaded', () => {
             const email = document.getElementById('login-email').value;
             const pass = document.getElementById('login-password').value;
             signInWithEmailAndPassword(auth, email, pass)
-                .then(() => console.log("Zalogowano!"))
+                .then(() => console.log("Zalogowano pomyślnie!"))
                 .catch(error => alert("Błąd logowania: " + error.message));
         });
     }
 });
 
-// --- STAN AUTORYZACJI ---
 onAuthStateChanged(auth, (user) => {
     const loginForm = document.getElementById('login-form');
     const appContainer = document.getElementById('app-container');
@@ -44,19 +43,19 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// --- GŁÓWNA APLIKACJA ---
+// --- GŁÓWNA LOGIKA APLIKACJI ---
 function initApp() {
-    // 1. Czujniki
+    // 1. Odczyty z czujników (Dashboard)
     onValue(ref(db, 'readings'), (sn) => {
         const d = sn.val();
         if (d) {
             document.getElementById('temperature').innerText = d.temperature.toFixed(1);
             document.getElementById('humidity').innerText = d.humidity.toFixed(0);
-            document.getElementById('connection-status').innerText = "Aktualizacja: " + (d.last_sync || "teraz");
+            document.getElementById('connection-status').innerText = "Ostatnia aktualizacja: " + (d.last_sync || "teraz");
         }
     });
 
-    // 2. Aktuatory (Urządzenia i LED)
+    // 2. Stan urządzeń i LED
     onValue(ref(db, 'actuators'), (sn) => {
         const d = sn.val();
         if (d) {
@@ -66,18 +65,18 @@ function initApp() {
             updateToggleButton('led-toggle-btn', d.led);
             document.getElementById('brightness-slider').value = d.brightness || 255;
             
-            // Ustaw kolor w pickerze jeśli przyszedł z bazy
             if (d.led_r !== undefined) {
                 document.getElementById('color-picker').value = rgbToHex(d.led_r, d.led_g, d.led_b);
             }
 
             document.querySelectorAll('.effect-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.getAttribute('data-mode') === d.led_mode);
+                const mode = btn.getAttribute('data-mode');
+                btn.classList.toggle('active', mode === d.led_mode);
             });
         }
     });
 
-    // 3. Ustawienia (Harmonogram i Cele) - zapobiega znikaniu danych
+    // 3. Synchronizacja Ustawień (Zapobiega znikaniu danych w polach)
     onValue(ref(db, 'settings'), (sn) => {
         const s = sn.val();
         if (s) {
@@ -94,9 +93,8 @@ function initApp() {
     renderRecentColors();
 }
 
-// --- STEROWANIE ---
+// --- FUNKCJE STERUJĄCE ---
 
-// Uniwersalny przełącznik ON/OFF
 const toggleFirebase = (path) => {
     const r = ref(db, path);
     onValue(r, (sn) => {
@@ -104,13 +102,14 @@ const toggleFirebase = (path) => {
     }, { onlyOnce: true });
 };
 
+// Przypisanie zdarzeń do przycisków
 document.getElementById('heater-toggle-btn').onclick = () => toggleFirebase('actuators/heater');
 document.getElementById('mist-toggle-btn').onclick = () => toggleFirebase('actuators/mist');
 document.getElementById('fan-toggle-btn').onclick = () => toggleFirebase('actuators/fan');
 document.getElementById('led-toggle-btn').onclick = () => toggleFirebase('actuators/led');
 document.getElementById('auto-mode-toggle-btn').onclick = () => toggleFirebase('settings/auto_enabled');
 
-// Kolory
+// Obsługa Kolorów
 document.getElementById('apply-color-btn').onclick = () => {
     const hex = document.getElementById('color-picker').value;
     updateColor(hex);
@@ -122,7 +121,9 @@ window.updateColor = (hex) => {
     const b = parseInt(hex.substring(5, 7), 16);
 
     update(ref(db, 'actuators'), {
-        led_r: r, led_g: g, led_b: b, led_mode: 'static'
+        led_r: r, led_g: g, led_b: b, 
+        led_mode: 'static',
+        led: true 
     });
     saveRecentColor(hex);
 };
@@ -135,11 +136,11 @@ document.getElementById('brightness-slider').oninput = (e) => {
 document.querySelectorAll('.effect-btn').forEach(btn => {
     btn.onclick = () => {
         const mode = btn.getAttribute('data-mode');
-        set(ref(db, 'actuators/led_mode'), mode);
+        update(ref(db, 'actuators'), { led_mode: mode, led: true });
     };
 });
 
-// Zapis ustawień (wszystkie pola naraz)
+// ZAPIS WSZYSTKICH USTAWIEŃ
 document.getElementById('save-settings-btn').onclick = () => {
     const updates = {
         target_temp: parseFloat(document.getElementById('target-temp-input').value),
@@ -148,7 +149,9 @@ document.getElementById('save-settings-btn').onclick = () => {
         led_on: document.getElementById('led-on-time').value,
         led_off: document.getElementById('led-off-time').value
     };
-    update(ref(db, 'settings'), updates).then(() => alert("Ustawienia zapisane!"));
+    update(ref(db, 'settings'), updates)
+        .then(() => alert("Ustawienia zapisane pomyślnie!"))
+        .catch(err => alert("Błąd zapisu: " + err.message));
 };
 
 // --- FUNKCJE POMOCNICZE ---
@@ -185,7 +188,7 @@ function renderRecentColors() {
     });
 }
 
-// --- WYKRESY ---
+// --- WYKRESY (Poprawione zakresy 4h, 12h, 24h) ---
 let mainChart;
 function initChart() {
     const canvas = document.getElementById('mainChart');
@@ -194,15 +197,18 @@ function initChart() {
     mainChart = new Chart(ctx, {
         type: 'line',
         data: { labels: [], datasets: [
-            { label: 'Temp (°C)', borderColor: '#ff3b30', data: [], yAxisID: 'y', tension: 0.3 },
-            { label: 'Wilg (%)', borderColor: '#007aff', data: [], yAxisID: 'y1', tension: 0.3 }
+            { label: 'Temp (°C)', borderColor: '#ff3b30', data: [], yAxisID: 'y', tension: 0.3, fill: true, backgroundColor: 'rgba(255, 59, 48, 0.1)' },
+            { label: 'Wilg (%)', borderColor: '#007aff', data: [], yAxisID: 'y1', tension: 0.3, fill: true, backgroundColor: 'rgba(0, 122, 255, 0.1)' }
         ]},
         options: {
             responsive: true, maintainAspectRatio: false,
-            scales: { y: { position: 'left' }, y1: { position: 'right', grid: { drawOnChartArea: false } } }
+            scales: { 
+                y: { type: 'linear', position: 'left', grid: { color: 'rgba(255,255,255,0.05)' } }, 
+                y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } } 
+            }
         }
     });
-    updateChartRange(8); // Start 4h (zakładając log co 30min)
+    updateChartRange(24); // Start: ostatnie 24 punkty
 }
 
 window.updateChartRange = (points) => {
