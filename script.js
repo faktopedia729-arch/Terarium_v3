@@ -1,33 +1,21 @@
-// Importy Firebase (Wersja v9/v10 Modularna)
+// --- IMPORTY (Nie zmieniaj ich, to linki do serwerów Google) ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, onValue, set, update, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// KONFIGURACJA (Wklej swoje prawdziwe dane tutaj)
-// Zaimportuj potrzebne funkcje z zestawów SDK, których potrzebujesz
-import { initializeApp } z "firebase/app" ;   
-import { getAnalytics } z "firebase/analytics" ;   
-// TODO: Dodaj zestawy SDK dla produktów Firebase, których chcesz używać
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Konfiguracja Firebase Twojej aplikacji internetowej
-// W przypadku Firebase JS SDK w wersji 7.20.0 i nowszych parametr measurementId jest opcjonalny
-const firebaseConfig = { 
-  apiKey : "AIzaSyDpKe0MWMGEIZ8w26ukKkRYwNWnzGa2S60" , 
-  authDomain : "terrarium-v3-21ba4.firebaseapp.com" , 
-  databaseURL : "https://terrarium-v3-21ba4-default-rtdb.europe-west1.firebasedatabase.app" , 
-  identyfikator projektu : "terrarium-v3-21ba4" , 
-  storageBucket : "terrarium-v3-21ba4.firebasestorage.app" , 
-  messagingSenderId : "387514732102" , 
-  Identyfikator aplikacji : "1:387514732102:web:0b5efff0510fe47b690447" , 
-  MeasurementId : "G-GSY4D9Z3EB" 
+// --- KONFIGURACJA (Poprawiłem nazwy pól na angielskie) ---
+const firebaseConfig = {
+    apiKey: "AIzaSyDpKe0MWMGEIZ8w26ukKkRYwNWnzGa2S60",
+    authDomain: "terrarium-v3-21ba4.firebaseapp.com",
+    databaseURL: "https://terrarium-v3-21ba4-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "terrarium-v3-21ba4",
+    storageBucket: "terrarium-v3-21ba4.firebasestorage.app",
+    messagingSenderId: "387514732102",
+    appId: "1:387514732102:web:0b5efff0510fe47b690447",
+    measurementId: "G-GSY4D9Z3EB"
 };
 
-// Zainicjuj Firebase
-//const app = initializeApp ( firebaseConfig );
-const analytics = getAnalytics ( aplikacja );
-
-// Inicjalizacja
+// --- INICJALIZACJA ---
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
@@ -35,10 +23,10 @@ const auth = getAuth(app);
 // Zmienna globalna dla wykresu
 let myChart = null;
 
-// --- OBSŁUGA UI I LOGOWANIA ---
+// --- URUCHOMIENIE PO ZAŁADOWANIU STRONY ---
 document.addEventListener('DOMContentLoaded', () => {
     
-    // Logowanie
+    // Obsługa przycisku logowania
     const loginBtn = document.getElementById('login-btn');
     if (loginBtn) {
         loginBtn.onclick = () => {
@@ -48,39 +36,46 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!email || !pass) { alert("Podaj email i hasło"); return; }
 
             signInWithEmailAndPassword(auth, email, pass)
-                .then(() => console.log("Zalogowano"))
+                .then(() => console.log("Zalogowano pomyślnie"))
                 .catch(e => {
-                    document.getElementById('auth-error').innerText = "Błąd: " + e.message;
-                    document.getElementById('auth-error').style.display = 'block';
+                    const errElem = document.getElementById('auth-error');
+                    if(errElem) {
+                        errElem.innerText = "Błąd: " + e.message;
+                        errElem.style.display = 'block';
+                    } else {
+                        alert("Błąd logowania: " + e.message);
+                    }
                 });
         };
     }
 
-    // Wylogowanie (opcjonalnie, jeśli dodasz przycisk w HTML)
+    // Obsługa wylogowania
     const logoutBtn = document.getElementById('logout-btn');
     if(logoutBtn) logoutBtn.onclick = () => signOut(auth);
 });
 
-// --- STANY UŻYTKOWNIKA ---
+// --- MONITOROWANIE STANU ZALOGOWANIA ---
 onAuthStateChanged(auth, (user) => {
     const loginForm = document.getElementById('login-form');
     const appContainer = document.getElementById('app-container');
 
     if (user) {
+        // Użytkownik zalogowany -> pokaż panel
         if (loginForm) loginForm.style.display = 'none';
         if (appContainer) appContainer.style.display = 'block';
-        initApp(); // Start nasłuchiwania danych
+        startAppLogic(); // Startujemy pobieranie danych
     } else {
+        // Użytkownik wylogowany -> pokaż logowanie
         if (loginForm) loginForm.style.display = 'flex';
         if (appContainer) appContainer.style.display = 'none';
     }
 });
 
-// --- GŁÓWNA LOGIKA DANYCH ---
-function initApp() {
+// --- GŁÓWNA LOGIKA APLIKACJI ---
+function startAppLogic() {
     console.log("Start aplikacji...");
 
-    // 1. ODCZYT SENSORÓW (Realtime)
+    // 1. ODCZYT SENSORÓW (Aktualizacja w czasie rzeczywistym)
     onValue(ref(db, 'readings'), (snapshot) => {
         const data = snapshot.val();
         if (data) {
@@ -101,13 +96,13 @@ function initApp() {
             updateBtnState('btn-fan', data.fan);
             updateBtnState('btn-led', data.led);
 
-            // Synchronizacja suwaka jasności (jeśli ktoś zmienił go na innym urządzeniu)
+            // Synchronizacja suwaka jasności
             const slider = document.getElementById('brightness-slider');
-            if (slider && document.activeElement !== slider) { // Nie zmieniaj jeśli użytkownik właśnie przesuwa
+            if (slider && document.activeElement !== slider) { 
                 slider.value = data.brightness || 255;
             }
 
-            // Tryb AUTO
+            // Tryb AUTO (Wizualizacja)
             const autoTxt = document.getElementById('auto-status-text');
             const autoIcon = document.getElementById('auto-icon');
             if(autoTxt && autoIcon) {
@@ -122,7 +117,7 @@ function initApp() {
         }
     });
 
-    // 3. INICJALIZACJA WYKRESU
+    // 3. URUCHOMIENIE WYKRESU
     initChart();
 }
 
@@ -140,44 +135,30 @@ function updateBtnState(id, isActive) {
     }
 }
 
-// --- FUNKCJE STERUJĄCE (Eksportowane do window dla HTML onclick) ---
+// --- FUNKCJE STERUJĄCE (Przypisane do window, aby działały w HTML) ---
 
 // Przełączanie ON/OFF
 window.toggleDevice = (deviceKey) => {
-    // Pobieramy aktualny stan, aby go odwrócić
-    // (Można też trzymać stan lokalnie w zmiennej, ale pobranie jest pewniejsze)
     const deviceRef = ref(db, `actuators/${deviceKey}`);
-    
-    // onValue z {onlyOnce: true} działa jak jednorazowy get()
     onValue(deviceRef, (snapshot) => {
         const current = snapshot.val();
-        const updates = {};
-        updates[`actuators/${deviceKey}`] = !current;
-        
-        // Opcjonalnie: Wyłącz tryb AUTO jeśli sterujemy ręcznie
-        // updates['actuators/auto_mode'] = false; 
-        
-        update(ref(db), updates);
+        // Odwracamy stan (jak było true to false, jak false to true)
+        update(ref(db), { [`actuators/${deviceKey}`]: !current });
     }, { onlyOnce: true });
 };
 
-// Zmiana koloru (HEX -> RGB)
+// Zmiana koloru
 window.handleColorChange = (hex) => {
     const r = parseInt(hex.substring(1, 3), 16);
     const g = parseInt(hex.substring(3, 5), 16);
     const b = parseInt(hex.substring(5, 7), 16);
 
-    // Zapisujemy od razu do bazy. ESP wykryje zmianę.
     update(ref(db, 'actuators'), {
-        led_r: r,
-        led_g: g,
-        led_b: b,
-        led_mode: 'static',
-        led: true
+        led_r: r, led_g: g, led_b: b, led_mode: 'static', led: true
     });
 };
 
-// Zmiana trybu LED (Fire, Storm etc.)
+// Zmiana trybu LED
 window.setLedMode = (mode) => {
     update(ref(db, 'actuators'), {
         led_mode: mode,
@@ -193,12 +174,14 @@ if(brightSlider) {
     });
 }
 
-// --- LOGIKA WYKRESU ---
+// --- LOGIKA WYKRESU (Chart.js) ---
 function initChart() {
     const ctx = document.getElementById('mainChart');
-    if(!ctx) return; // Jeśli nie ma elementu canvas, przerwij (np. strona logowania)
+    if(!ctx) return; 
 
-    // Konfiguracja wykresu
+    // Jeśli wykres już istnieje, niszczymy go przed stworzeniem nowego
+    if(myChart) myChart.destroy();
+
     myChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -234,7 +217,7 @@ function initChart() {
         }
     });
 
-    // Pobieranie ostatnich 20 wpisów historii
+    // Pobieranie historii (ostatnie 20 wpisów)
     const historyQuery = query(ref(db, 'history'), limitToLast(20));
     
     onValue(historyQuery, (snapshot) => {
@@ -245,15 +228,14 @@ function initChart() {
         const temps = [];
         const hums = [];
 
-        // Firebase zwraca obiekt, musimy go posortować po kluczach (timestampach)
         Object.keys(data).sort().forEach(timestamp => {
             const entry = data[timestamp];
-            const date = new Date(parseInt(timestamp) * 1000); // Konwersja sekund na ms
+            const date = new Date(parseInt(timestamp) * 1000); 
             const timeStr = date.getHours() + ":" + (date.getMinutes() < 10 ? '0' : '') + date.getMinutes();
             
             labels.push(timeStr);
-            temps.push(entry.t); // t = temperatura (skrót dla oszczędności bazy)
-            hums.push(entry.h);  // h = wilgotność
+            temps.push(entry.t);
+            hums.push(entry.h);
         });
 
         myChart.data.labels = labels;
