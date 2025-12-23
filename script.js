@@ -1,3 +1,4 @@
+// DODANO: initializeApp do listy importów
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, onValue, set, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -10,6 +11,7 @@ const firebaseConfig = {
     appId: "1:387514732102:web:0b5efff0510fe47b690447"
 };
 
+// Inicjalizacja Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
@@ -46,7 +48,7 @@ function initApp() {
         }
     });
 
-    // Odczyt stanów urządzeń
+    // Odczyt stanów urządzeń + Nowa obsługa LED
     onValue(ref(db, 'actuators'), (sn) => {
         const d = sn.val();
         if (d) {
@@ -54,6 +56,17 @@ function initApp() {
             updateUI('mist-toggle-btn', d.mist);
             updateUI('fan-toggle-btn', d.fan);
             updateUI('led-toggle-btn', d.led);
+
+            // AKTUALIZACJA UI LED (Kolor i Jasność)
+            if (d.led_r !== undefined && d.led_g !== undefined && d.led_b !== undefined) {
+                const hex = "#" + ((1 << 24) + (d.led_r << 16) + (d.led_g << 8) + d.led_b).toString(16).slice(1);
+                const colorPicker = document.getElementById('color-picker');
+                if (colorPicker) colorPicker.value = hex;
+            }
+            if (d.brightness !== undefined) {
+                const slider = document.getElementById('brightness-slider');
+                if (slider) slider.value = d.brightness;
+            }
         }
     });
 
@@ -67,7 +80,7 @@ function updateUI(id, state) {
     }
 }
 
-// Funkcja przełączania
+// Funkcja przełączania ON/OFF
 window.toggleDevice = (key) => {
     const r = ref(db, `actuators/${key}`);
     onValue(r, (sn) => {
@@ -75,12 +88,48 @@ window.toggleDevice = (key) => {
     }, { onlyOnce: true });
 };
 
-// Przypisanie zdarzeń do przycisków
+// Przypisanie zdarzeń do przycisków ON/OFF
 document.getElementById('heater-toggle-btn').onclick = () => toggleDevice('heater');
 document.getElementById('mist-toggle-btn').onclick = () => toggleDevice('mist');
 document.getElementById('fan-toggle-btn').onclick = () => toggleDevice('fan');
 document.getElementById('led-toggle-btn').onclick = () => toggleDevice('led');
 
+// --- NOWA OBSŁUGA OŚWIETLENIA (KOLOR I TRYBY) ---
+
+window.updateColor = (hex) => {
+    const r = parseInt(hex.substring(1, 3), 16);
+    const g = parseInt(hex.substring(3, 5), 16);
+    const b = parseInt(hex.substring(5, 7), 16);
+
+    // Wysyłamy do serwera lokalnego NodeMCU (szybka reakcja)
+    fetch(`/setColor?r=${r}&g=${g}&b=${b}`)
+        .then(() => console.log("Wysłano do NodeMCU"))
+        .catch(err => console.error("Błąd lokalny:", err));
+
+    // Zapisujemy do Firebase (Typ: Number)
+    set(ref(db, 'actuators/led_r'), r);
+    set(ref(db, 'actuators/led_g'), g);
+    set(ref(db, 'actuators/led_b'), b);
+    set(ref(db, 'actuators/led_mode'), "static");
+};
+
+window.setLedMode = (mode) => {
+    fetch(`/setMode?m=${mode}`)
+        .then(() => {
+            console.log("Tryb zmieniony na:", mode);
+            set(ref(db, 'actuators/led_mode'), mode);
+        });
+};
+
+const brightnessSlider = document.getElementById('brightness-slider');
+if (brightnessSlider) {
+    brightnessSlider.oninput = (e) => {
+        const val = parseInt(e.target.value);
+        set(ref(db, 'actuators/brightness'), val);
+    };
+}
+
+// --- WYKRES ---
 function initChart() {
     const ctx = document.getElementById('mainChart').getContext('2d');
     const chart = new Chart(ctx, {
@@ -138,7 +187,6 @@ function initChart() {
         }
     });
 
-    // Dynamiczna aktualizacja zakresu
     window.updateChartRange = (points) => {
         const historyRef = query(ref(db, 'history'), limitToLast(points));
         onValue(historyRef, (sn) => {
@@ -164,58 +212,5 @@ function initChart() {
         });
     };
 
-    updateChartRange(20); // Start z 5h
+    updateChartRange(20);
 }
-// --- NOWA OBSŁUGA OŚWIETLENIA ---
-
-// 1. Obsługa zmiany koloru (zapis do NodeMCU i Firebase)
-window.updateColor = (hex) => {
-    const r = parseInt(hex.substring(1, 3), 16);
-    const g = parseInt(hex.substring(3, 5), 16);
-    const b = parseInt(hex.substring(5, 7), 16);
-
-    // Wysyłamy do serwera lokalnego NodeMCU (szybka reakcja)
-    fetch(`/setColor?r=${r}&g=${g}&b=${b}`)
-        .then(() => console.log("Kolor wysłany do NodeMCU"))
-        .catch(err => console.error("Błąd wysyłki lokalnej:", err));
-
-    // Zapisujemy do Firebase (synchronizacja stanu)
-    set(ref(db, 'actuators/led_r'), r);
-    set(ref(db, 'actuators/led_g'), g);
-    set(ref(db, 'actuators/led_b'), b);
-    set(ref(db, 'actuators/led_mode'), "static");
-};
-
-// 2. Obsługa trybów animacji
-window.setLedMode = (mode) => {
-    fetch(`/setMode?m=${mode}`)
-        .then(() => {
-            console.log("Tryb zmieniony na:", mode);
-            set(ref(db, 'actuators/led_mode'), mode);
-        });
-};
-
-// 3. Obsługa jasności
-const brightnessSlider = document.getElementById('brightness-slider');
-if (brightnessSlider) {
-    brightnessSlider.oninput = (e) => {
-        const val = parseInt(e.target.value);
-        set(ref(db, 'actuators/brightness'), val);
-    };
-}
-
-// Rozszerzenie funkcji initApp o nasłuchiwanie nowych wartości
-// Dodaj to wewnątrz istniejącej funkcji initApp()
-onValue(ref(db, 'actuators'), (sn) => {
-    const d = sn.val();
-    if (d) {
-        if (d.led_r && d.led_g && d.led_b) {
-            // Konwersja RGB na HEX dla pickera
-            const hex = "#" + ((1 << 24) + (d.led_r << 16) + (d.led_g << 8) + d.led_b).toString(16).slice(1);
-            document.getElementById('color-picker').value = hex;
-        }
-        if (d.brightness) {
-            document.getElementById('brightness-slider').value = d.brightness;
-        }
-    }
-});
