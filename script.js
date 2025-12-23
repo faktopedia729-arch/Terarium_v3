@@ -17,36 +17,74 @@ const db = getDatabase(app);
 const auth = getAuth(app);
 
 // --- LOGOWANIE ---
-const loginBtn = document.getElementById('login-btn');
-if (loginBtn) {
-    loginBtn.onclick = () => {
-        const email = document.getElementById('login-email').value;
-        const pass = document.getElementById('login-password').value;
-        signInWithEmailAndPassword(auth, email, pass)
-            .catch(e => alert("Błąd logowania: " + e.message));
-    };
-}
+// Czekamy na pełne załadowanie struktury HTML
+document.addEventListener('DOMContentLoaded', () => {
+    const loginBtn = document.getElementById('login-btn');
 
+    if (loginBtn) {
+        loginBtn.onclick = () => {
+            console.log("Próba logowania..."); // Zobaczysz to w konsoli F12
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-password').value;
+
+            if (!email || !pass) {
+                alert("Wpisz email i hasło!");
+                return;
+            }
+
+            signInWithEmailAndPassword(auth, email, pass)
+                .then((userCredential) => {
+                    console.log("Zalogowano użytkownika:", userCredential.user.email);
+                })
+                .catch(e => {
+                    console.error("Błąd Firebase Auth:", e.code);
+                    alert("Błąd logowania: " + e.message);
+                });
+        };
+    } else {
+        console.error("Nie znaleziono przycisku login-btn w HTML!");
+    }
+});
+
+// Reakcja na zmianę stanu zalogowania
 onAuthStateChanged(auth, (user) => {
+    const loginForm = document.getElementById('login-form');
+    const appContainer = document.getElementById('app-container');
+
     if (user) {
-        document.getElementById('login-form').style.display = 'none';
-        document.getElementById('app-container').style.display = 'block';
+        console.log("Użytkownik zalogowany - przełączam widok.");
+        if (loginForm) loginForm.style.display = 'none';
+        if (appContainer) appContainer.style.display = 'block';
         initApp();
     } else {
-        document.getElementById('login-form').style.display = 'flex';
-        document.getElementById('app-container').style.display = 'none';
+        console.log("Użytkownik niezalogowany.");
+        if (loginForm) loginForm.style.display = 'flex';
+        if (appContainer) appContainer.style.display = 'none';
     }
 });
 
 function initApp() {
-    // Odczyt czujników
-    onValue(ref(db, 'readings'), (sn) => {
+    console.log("Inicjalizacja pobierania danych z Firebase...");
+    const readingsRef = ref(db, 'readings');
+    
+    onValue(readingsRef, (sn) => {
         const d = sn.val();
         if (d) {
-            document.getElementById('temperature').innerText = d.temperature.toFixed(1);
-            document.getElementById('humidity').innerText = d.humidity.toFixed(0);
+            console.log("Nowe dane z NodeMCU:", d);
+            const tempElem = document.getElementById('temperature');
+            const humElem = document.getElementById('humidity');
+            
+            if (tempElem && d.temperature !== undefined) {
+                tempElem.innerText = d.temperature.toFixed(1);
+            }
+            if (humElem && d.humidity !== undefined) {
+                humElem.innerText = d.humidity.toFixed(0);
+            }
         }
+    }, (error) => {
+        console.error("Błąd odczytu bazy danych:", error);
     });
+}
 
     // Odczyt stanów urządzeń + Nowa obsługa LED
     onValue(ref(db, 'actuators'), (sn) => {
