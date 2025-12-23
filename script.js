@@ -2,6 +2,34 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getDatabase, ref, onValue, set, update, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+// Funkcja, która uruchomi się dopiero gdy strona się wczyta
+window.addEventListener('DOMContentLoaded', () => {
+    const loginBtn = document.getElementById('login-btn');
+    
+    if (loginBtn) {
+        console.log("System gotowy, przycisk logowania znaleziony.");
+
+        loginBtn.addEventListener('click', (e) => {
+            e.preventDefault(); // Zapobiega przeładowaniu strony
+            
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-password').value;
+
+            console.log("Próba logowania dla:", email);
+
+            signInWithEmailAndPassword(auth, email, pass)
+                .then((userCredential) => {
+                    console.log("Zalogowano pomyślnie!");
+                })
+                .catch((error) => {
+                    console.error("Błąd Firebase:", error.code, error.message);
+                    alert("Błąd: " + error.message);
+                });
+        });
+    } else {
+        console.error("Nie znaleziono przycisku o ID 'login-btn'!");
+    }
+});
 // --- KONFIGURACJA ---
 const firebaseConfig = {
     apiKey: "AIzaSyDpKe0MWMGEIZ8w26ukKkRYwNWnzGa2S60",
