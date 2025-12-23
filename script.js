@@ -229,3 +229,21 @@ window.updateChartRange = (points) => {
 document.querySelectorAll('.range-btn').forEach(btn => {
     btn.onclick = () => updateChartRange(parseInt(btn.getAttribute('data-points')));
 });
+
+// Obsługa przycisku AUTO
+document.getElementById('auto-mode-toggle-btn').onclick = () => {
+    const r = ref(db, 'settings/auto_enabled');
+    onValue(r, (sn) => {
+        set(r, !sn.val());
+    }, { onlyOnce: true });
+};
+
+// Obsługa przycisku Zapisz
+document.getElementById('save-settings-btn').onclick = () => {
+    const updates = {
+        target_temp: parseFloat(document.getElementById('target-temp-input').value),
+        target_hum: parseFloat(document.getElementById('target-hum-input').value),
+        hum_margin: parseFloat(document.getElementById('hum-margin-input').value)
+    };
+    update(ref(db, 'settings'), updates).then(() => alert("Zapisano!"));
+};
