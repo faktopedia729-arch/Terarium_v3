@@ -1,246 +1,247 @@
-// --- IMPORTY (Nie zmieniaj ich, to linki do serwerów Google) ---
+// Importy Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, onValue, set, update, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getDatabase, ref, onValue, set, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-// --- KONFIGURACJA (Poprawiłem nazwy pól na angielskie) ---
 const firebaseConfig = {
-    apiKey: "AIzaSyDpKe0MWMGEIZ8w26ukKkRYwNWnzGa2S60",
-    authDomain: "terrarium-v3-21ba4.firebaseapp.com",
-    databaseURL: "https://terrarium-v3-21ba4-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "terrarium-v3-21ba4",
-    storageBucket: "terrarium-v3-21ba4.firebasestorage.app",
-    messagingSenderId: "387514732102",
-    appId: "1:387514732102:web:0b5efff0510fe47b690447",
-    measurementId: "G-GSY4D9Z3EB"
+    apiKey: "AIzaSyDpKe0MWMGEIZ8w26ukKkRYwNWnzGa2S60",
+    authDomain: "terrarium-v3-21ba4.firebaseapp.com",
+    databaseURL: "https://terrarium-v3-21ba4-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "terrarium-v3-21ba4",
+    appId: "1:387514732102:web:0b5efff0510fe47b690447"
 };
 
-// --- INICJALIZACJA ---
+// Inicjalizacja Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// Zmienna globalna dla wykresu
-let myChart = null;
-
-// --- URUCHOMIENIE PO ZAŁADOWANIU STRONY ---
+// --- LOGOWANIE (DOMContentLoaded) ---
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // Obsługa przycisku logowania
-    const loginBtn = document.getElementById('login-btn');
-    if (loginBtn) {
-        loginBtn.onclick = () => {
-            const email = document.getElementById('login-email').value;
-            const pass = document.getElementById('login-password').value;
+    const loginBtn = document.getElementById('login-btn');
+    if (loginBtn) {
+        loginBtn.onclick = () => {
+            console.log("Próba logowania...");
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-password').value;
 
-            if (!email || !pass) { alert("Podaj email i hasło"); return; }
+            if (!email || !pass) {
+                alert("Wpisz email i hasło!");
+                return;
+            }
 
-            signInWithEmailAndPassword(auth, email, pass)
-                .then(() => console.log("Zalogowano pomyślnie"))
-                .catch(e => {
-                    const errElem = document.getElementById('auth-error');
-                    if(errElem) {
-                        errElem.innerText = "Błąd: " + e.message;
-                        errElem.style.display = 'block';
-                    } else {
-                        alert("Błąd logowania: " + e.message);
-                    }
-                });
-        };
-    }
+            signInWithEmailAndPassword(auth, email, pass)
+                .then((userCredential) => {
+                    console.log("Zalogowano użytkownika:", userCredential.user.email);
+                })
+                .catch(e => {
+                    console.error("Błąd Firebase Auth:", e.code);
+                    alert("Błąd logowania: " + e.message);
+                });
+        };
+    } else {
+        console.error("Nie znaleziono przycisku login-btn w HTML!");
+    }
 
-    // Obsługa wylogowania
-    const logoutBtn = document.getElementById('logout-btn');
-    if(logoutBtn) logoutBtn.onclick = () => signOut(auth);
+    // Przypisanie zdarzeń do przycisków ON/OFF (po załadowaniu DOM)
+    const heaterBtn = document.getElementById('heater-toggle-btn');
+    if(heaterBtn) heaterBtn.onclick = () => toggleDevice('heater');
+    
+    const mistBtn = document.getElementById('mist-toggle-btn');
+    if(mistBtn) mistBtn.onclick = () => toggleDevice('mist');
+    
+    const fanBtn = document.getElementById('fan-toggle-btn');
+    if(fanBtn) fanBtn.onclick = () => toggleDevice('fan');
+    
+    const ledBtn = document.getElementById('led-toggle-btn');
+    if(ledBtn) ledBtn.onclick = () => toggleDevice('led');
 });
 
-// --- MONITOROWANIE STANU ZALOGOWANIA ---
+// Reakcja na zmianę stanu zalogowania
 onAuthStateChanged(auth, (user) => {
-    const loginForm = document.getElementById('login-form');
-    const appContainer = document.getElementById('app-container');
+    const loginForm = document.getElementById('login-form');
+    const appContainer = document.getElementById('app-container');
 
-    if (user) {
-        // Użytkownik zalogowany -> pokaż panel
-        if (loginForm) loginForm.style.display = 'none';
-        if (appContainer) appContainer.style.display = 'block';
-        startAppLogic(); // Startujemy pobieranie danych
-    } else {
-        // Użytkownik wylogowany -> pokaż logowanie
-        if (loginForm) loginForm.style.display = 'flex';
-        if (appContainer) appContainer.style.display = 'none';
-    }
+    if (user) {
+        console.log("Użytkownik zalogowany - przełączam widok.");
+        if (loginForm) loginForm.style.display = 'none';
+        if (appContainer) appContainer.style.display = 'block';
+        initApp();
+    } else {
+        console.log("Użytkownik niezalogowany.");
+        if (loginForm) loginForm.style.display = 'flex';
+        if (appContainer) appContainer.style.display = 'none';
+    }
 });
 
-// --- GŁÓWNA LOGIKA APLIKACJI ---
-function startAppLogic() {
-    console.log("Start aplikacji...");
+// --- GŁÓWNA APLIKACJA ---
+function initApp() {
+    console.log("Inicjalizacja pobierania danych z Firebase...");
+    
+    // 1. Odczyt czujników
+    const readingsRef = ref(db, 'readings');
+    onValue(readingsRef, (sn) => {
+        const d = sn.val();
+        if (d) {
+            console.log("Nowe dane z NodeMCU:", d);
+            const tempElem = document.getElementById('temperature');
+            const humElem = document.getElementById('humidity');
+            if (tempElem && d.temperature !== undefined) tempElem.innerText = d.temperature.toFixed(1);
+            if (humElem && d.humidity !== undefined) humElem.innerText = d.humidity.toFixed(0);
+        }
+    });
 
-    // 1. ODCZYT SENSORÓW (Aktualizacja w czasie rzeczywistym)
-    onValue(ref(db, 'readings'), (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-            updateText('val-temp', data.temperature ? data.temperature.toFixed(1) : '--');
-            updateText('val-hum', data.humidity ? data.humidity.toFixed(0) : '--');
-            
-            const now = new Date();
-            updateText('last-update', now.toLocaleTimeString());
-        }
-    });
+    // 2. Odczyt stanów urządzeń + LED
+    onValue(ref(db, 'actuators'), (sn) => {
+        const d = sn.val();
+        if (d) {
+            updateUI('heater-toggle-btn', d.heater);
+            updateUI('mist-toggle-btn', d.mist);
+            updateUI('fan-toggle-btn', d.fan);
+            updateUI('led-toggle-btn', d.led);
 
-    // 2. SYNCHRONIZACJA PRZYCISKÓW I SUWAKÓW
-    onValue(ref(db, 'actuators'), (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-            updateBtnState('btn-heater', data.heater);
-            updateBtnState('btn-mist', data.mist);
-            updateBtnState('btn-fan', data.fan);
-            updateBtnState('btn-led', data.led);
+            // Aktualizacja UI LED
+            if (d.led_r !== undefined && d.led_g !== undefined && d.led_b !== undefined) {
+                const hex = "#" + ((1 << 24) + (d.led_r << 16) + (d.led_g << 8) + d.led_b).toString(16).slice(1);
+                const colorPicker = document.getElementById('color-picker');
+                if (colorPicker) colorPicker.value = hex;
+            }
+            if (d.brightness !== undefined) {
+                const slider = document.getElementById('brightness-slider');
+                if (slider) slider.value = d.brightness;
+            }
+        }
+    });
 
-            // Synchronizacja suwaka jasności
-            const slider = document.getElementById('brightness-slider');
-            if (slider && document.activeElement !== slider) { 
-                slider.value = data.brightness || 255;
-            }
-
-            // Tryb AUTO (Wizualizacja)
-            const autoTxt = document.getElementById('auto-status-text');
-            const autoIcon = document.getElementById('auto-icon');
-            if(autoTxt && autoIcon) {
-                if(data.auto_mode) {
-                    autoTxt.innerText = "ON"; autoTxt.style.color = "#00e676";
-                    autoIcon.style.color = "#00e676";
-                } else {
-                    autoTxt.innerText = "OFF"; autoTxt.style.color = "#666";
-                    autoIcon.style.color = "#666";
-                }
-            }
-        }
-    });
-
-    // 3. URUCHOMIENIE WYKRESU
-    initChart();
+    // 3. Uruchomienie wykresu
+    initChart();
 }
 
-// --- FUNKCJE POMOCNICZE UI ---
-function updateText(id, val) {
-    const el = document.getElementById(id);
-    if(el) el.innerText = val;
+// Funkcje pomocnicze
+function updateUI(id, state) {
+    const btn = document.getElementById(id);
+    if (btn) {
+        state ? btn.classList.add('active') : btn.classList.remove('active');
+    }
 }
 
-function updateBtnState(id, isActive) {
-    const btn = document.getElementById(id);
-    if(btn) {
-        if(isActive) btn.classList.add('active');
-        else btn.classList.remove('active');
-    }
-}
-
-// --- FUNKCJE STERUJĄCE (Przypisane do window, aby działały w HTML) ---
-
-// Przełączanie ON/OFF
-window.toggleDevice = (deviceKey) => {
-    const deviceRef = ref(db, `actuators/${deviceKey}`);
-    onValue(deviceRef, (snapshot) => {
-        const current = snapshot.val();
-        // Odwracamy stan (jak było true to false, jak false to true)
-        update(ref(db), { [`actuators/${deviceKey}`]: !current });
-    }, { onlyOnce: true });
+window.toggleDevice = (key) => {
+    const r = ref(db, `actuators/${key}`);
+    onValue(r, (sn) => {
+        set(r, !sn.val());
+    }, { onlyOnce: true });
 };
 
-// Zmiana koloru
-window.handleColorChange = (hex) => {
-    const r = parseInt(hex.substring(1, 3), 16);
-    const g = parseInt(hex.substring(3, 5), 16);
-    const b = parseInt(hex.substring(5, 7), 16);
+// --- OBSŁUGA OŚWIETLENIA ---
+window.updateColor = (hex) => {
+    const r = parseInt(hex.substring(1, 3), 16);
+    const g = parseInt(hex.substring(3, 5), 16);
+    const b = parseInt(hex.substring(5, 7), 16);
 
-    update(ref(db, 'actuators'), {
-        led_r: r, led_g: g, led_b: b, led_mode: 'static', led: true
-    });
+    // Synchronizacja z NodeMCU (opcjonalna)
+    fetch(`/setColor?r=${r}&g=${g}&b=${b}`).catch(() => {});
+
+    // Zapis do Firebase
+    set(ref(db, 'actuators/led_r'), r);
+    set(ref(db, 'actuators/led_g'), g);
+    set(ref(db, 'actuators/led_b'), b);
+    set(ref(db, 'actuators/led_mode'), "static");
 };
 
-// Zmiana trybu LED
 window.setLedMode = (mode) => {
-    update(ref(db, 'actuators'), {
-        led_mode: mode,
-        led: true
-    });
+    fetch(`/setMode?m=${mode}`).catch(() => {});
+    set(ref(db, 'actuators/led_mode'), mode);
 };
 
-// Obsługa suwaka jasności
-const brightSlider = document.getElementById('brightness-slider');
-if(brightSlider) {
-    brightSlider.addEventListener('change', (e) => {
-        set(ref(db, 'actuators/brightness'), parseInt(e.target.value));
-    });
+const brightnessSlider = document.getElementById('brightness-slider');
+if (brightnessSlider) {
+    brightnessSlider.oninput = (e) => {
+        set(ref(db, 'actuators/brightness'), parseInt(e.target.value));
+    };
 }
 
-// --- LOGIKA WYKRESU (Chart.js) ---
+// --- SEKCJA WYKRESU ---
 function initChart() {
-    const ctx = document.getElementById('mainChart');
-    if(!ctx) return; 
+    const chartCtx = document.getElementById('mainChart');
+    if (!chartCtx) return;
+    const ctx = chartCtx.getContext('2d');
 
-    // Jeśli wykres już istnieje, niszczymy go przed stworzeniem nowego
-    if(myChart) myChart.destroy();
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Temperatura (°C)',
+                    borderColor: '#ff3b30',
+                    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+                    data: [],
+                    yAxisID: 'y',
+                    tension: 0.3,
+                    fill: true
+                },
+                {
+                    label: 'Wilgotność (%)',
+                    borderColor: '#007aff',
+                    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+                    data: [],
+                    yAxisID: 'y1',
+                    tension: 0.3,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                    ticks: { color: '#888', autoSkip: true, maxTicksLimit: 10 }
+                },
+                y: {
+                    type: 'linear',
+                    position: 'left',
+                    title: { display: true, text: '°C' },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'right',
+                    title: { display: true, text: '%' },
+                    grid: { drawOnChartArea: false }
+                }
+            },
+            plugins: {
+                legend: { labels: { color: '#fff' } }
+            }
+        }
+    });
 
-    myChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: 'Temperatura (°C)',
-                borderColor: '#ff5252',
-                backgroundColor: 'rgba(255, 82, 82, 0.1)',
-                data: [],
-                fill: true,
-                tension: 0.4,
-                yAxisID: 'y'
-            }, {
-                label: 'Wilgotność (%)',
-                borderColor: '#40c4ff',
-                backgroundColor: 'rgba(64, 196, 255, 0.1)',
-                data: [],
-                fill: true,
-                tension: 0.4,
-                yAxisID: 'y1'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            scales: {
-                x: { grid: { color: '#333' }, ticks: { color: '#888' } },
-                y: { type: 'linear', position: 'left', grid: { color: '#333' }, ticks: { color: '#ccc' } },
-                y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#ccc' } }
-            },
-            plugins: { legend: { labels: { color: '#fff' } } }
-        }
-    });
+    window.updateChartRange = (points) => {
+        const historyRef = query(ref(db, 'history'), limitToLast(points));
+        onValue(historyRef, (sn) => {
+            const d = sn.val();
+            if (!d) return;
 
-    // Pobieranie historii (ostatnie 20 wpisów)
-    const historyQuery = query(ref(db, 'history'), limitToLast(20));
-    
-    onValue(historyQuery, (snapshot) => {
-        const data = snapshot.val();
-        if (!data) return;
+            const labels = [];
+            const tempData = [];
+            const humData = [];
 
-        const labels = [];
-        const temps = [];
-        const hums = [];
+            Object.keys(d).sort().forEach(k => {
+                const date = new Date(parseInt(k) * 1000);
+                const timeStr = date.getHours() + ":" + (date.getMinutes() < 10 ? '0' : '') + date.getMinutes();
+                labels.push(timeStr);
+                tempData.push(d[k].t);
+                humData.push(d[k].h);
+            });
 
-        Object.keys(data).sort().forEach(timestamp => {
-            const entry = data[timestamp];
-            const date = new Date(parseInt(timestamp) * 1000); 
-            const timeStr = date.getHours() + ":" + (date.getMinutes() < 10 ? '0' : '') + date.getMinutes();
-            
-            labels.push(timeStr);
-            temps.push(entry.t);
-            hums.push(entry.h);
-        });
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = tempData;
+            chart.data.datasets[1].data = humData;
+            chart.update();
+        });
+    };
 
-        myChart.data.labels = labels;
-        myChart.data.datasets[0].data = temps;
-        myChart.data.datasets[1].data = hums;
-        myChart.update();
-    });
+    updateChartRange(20);
 }
