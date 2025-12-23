@@ -1,7 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, onValue, set, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, onValue, set, update, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+// --- KONFIGURACJA ---
 const firebaseConfig = {
     apiKey: "AIzaSyDpKe0MWMGEIZ8w26ukKkRYwNWnzGa2S60",
     authDomain: "terrarium-v3-21ba4.firebaseapp.com",
@@ -14,14 +15,13 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// --- LOGOWANIE ---
+// --- OBSŁUGA LOGOWANIA ---
 const loginBtn = document.getElementById('login-btn');
 if (loginBtn) {
     loginBtn.onclick = () => {
         const email = document.getElementById('login-email').value;
         const pass = document.getElementById('login-password').value;
-        signInWithEmailAndPassword(auth, email, pass)
-            .catch(e => alert("Błąd logowania: " + e.message));
+        signInWithEmailAndPassword(auth, email, pass).catch(e => alert("Błąd: " + e.message));
     };
 }
 
@@ -36,186 +36,168 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
+// --- GŁÓWNA LOGIKA APLIKACJI ---
 function initApp() {
-    // Odczyt czujników
+    // 1. Nasłuchiwanie czujników (Dashboard)
     onValue(ref(db, 'readings'), (sn) => {
         const d = sn.val();
         if (d) {
             document.getElementById('temperature').innerText = d.temperature.toFixed(1);
             document.getElementById('humidity').innerText = d.humidity.toFixed(0);
+            document.getElementById('connection-status').innerText = "Ostatnia aktualizacja: " + (d.last_sync || "teraz");
         }
     });
 
-    // Odczyt stanów urządzeń
+    // 2. Nasłuchiwanie stanów urządzeń (Synchronizacja przycisków i suwaków)
     onValue(ref(db, 'actuators'), (sn) => {
         const d = sn.val();
         if (d) {
-            updateUI('heater-toggle-btn', d.heater);
-            updateUI('mist-toggle-btn', d.mist);
-            updateUI('fan-toggle-btn', d.fan);
-            updateUI('led-toggle-btn', d.led);
+            updateToggleButton('heater-toggle-btn', d.heater);
+            updateToggleButton('mist-toggle-btn', d.mist);
+            updateToggleButton('fan-toggle-btn', d.fan);
+            updateToggleButton('led-toggle-btn', d.led);
+            
+            // Kolor i jasność
+            if (d.led_r !== undefined) {
+                const hex = rgbToHex(d.led_r, d.led_g, d.led_b);
+                document.getElementById('color-picker').value = hex;
+            }
+            if (d.brightness !== undefined) {
+                document.getElementById('brightness-slider').value = d.brightness;
+            }
+            
+            // Zaznaczenie aktywnego trybu LED
+            document.querySelectorAll('.effect-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-mode') === d.led_mode);
+            });
         }
     });
 
     initChart();
+    renderRecentColors();
 }
 
-function updateUI(id, state) {
-    const btn = document.getElementById(id);
-    if (btn) {
-        state ? btn.classList.add('active') : btn.classList.remove('active');
-    }
-}
+// --- FUNKCJE STERUJĄCE ---
 
-// Funkcja przełączania
-window.toggleDevice = (key) => {
+// Przełączanie urządzeń (On/Off)
+const toggleDevice = (key) => {
     const r = ref(db, `actuators/${key}`);
+    // Pobieramy aktualny stan raz i wysyłamy przeciwny
     onValue(r, (sn) => {
         set(r, !sn.val());
     }, { onlyOnce: true });
 };
 
-// Przypisanie zdarzeń do przycisków
+// Obsługa przycisków w gridzie
 document.getElementById('heater-toggle-btn').onclick = () => toggleDevice('heater');
 document.getElementById('mist-toggle-btn').onclick = () => toggleDevice('mist');
 document.getElementById('fan-toggle-btn').onclick = () => toggleDevice('fan');
 document.getElementById('led-toggle-btn').onclick = () => toggleDevice('led');
 
-function initChart() {
-    const ctx = document.getElementById('mainChart').getContext('2d');
-    const chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [
-                {
-                    label: 'Temperatura (°C)',
-                    borderColor: '#ff3b30',
-                    backgroundColor: 'rgba(255, 59, 48, 0.1)',
-                    data: [],
-                    yAxisID: 'y',
-                    tension: 0.3,
-                    fill: true
-                },
-                {
-                    label: 'Wilgotność (%)',
-                    borderColor: '#007aff',
-                    backgroundColor: 'rgba(0, 122, 255, 0.1)',
-                    data: [],
-                    yAxisID: 'y1',
-                    tension: 0.3,
-                    fill: true
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    display: true,
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                    ticks: { color: '#888', autoSkip: true, maxTicksLimit: 10 }
-                },
-                y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    title: { display: true, text: '°C' },
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    title: { display: true, text: '%' },
-                    grid: { drawOnChartArea: false }
-                }
-            },
-            plugins: {
-                legend: { labels: { color: '#fff' } }
-            }
-        }
-    });
-
-    // Dynamiczna aktualizacja zakresu
-    window.updateChartRange = (points) => {
-        const historyRef = query(ref(db, 'history'), limitToLast(points));
-        onValue(historyRef, (sn) => {
-            const d = sn.val();
-            if (!d) return;
-
-            const labels = [];
-            const tempData = [];
-            const humData = [];
-
-            Object.keys(d).sort().forEach(k => {
-                const date = new Date(parseInt(k) * 1000);
-                const timeStr = date.getHours() + ":" + (date.getMinutes() < 10 ? '0' : '') + date.getMinutes();
-                labels.push(timeStr);
-                tempData.push(d[k].t);
-                humData.push(d[k].h);
-            });
-
-            chart.data.labels = labels;
-            chart.data.datasets[0].data = tempData;
-            chart.data.datasets[1].data = humData;
-            chart.update();
-        });
-    };
-
-    updateChartRange(20); // Start z 5h
-}
-// --- NOWA OBSŁUGA OŚWIETLENIA ---
-
-// 1. Obsługa zmiany koloru (zapis do NodeMCU i Firebase)
+// Zmiana koloru LED
 window.updateColor = (hex) => {
     const r = parseInt(hex.substring(1, 3), 16);
     const g = parseInt(hex.substring(3, 5), 16);
     const b = parseInt(hex.substring(5, 7), 16);
 
-    // Wysyłamy do serwera lokalnego NodeMCU (szybka reakcja)
-    fetch(`/setColor?r=${r}&g=${g}&b=${b}`)
-        .then(() => console.log("Kolor wysłany do NodeMCU"))
-        .catch(err => console.error("Błąd wysyłki lokalnej:", err));
-
-    // Zapisujemy do Firebase (synchronizacja stanu)
-    set(ref(db, 'actuators/led_r'), r);
-    set(ref(db, 'actuators/led_g'), g);
-    set(ref(db, 'actuators/led_b'), b);
-    set(ref(db, 'actuators/led_mode'), "static");
+    update(ref(db, 'actuators'), {
+        led_r: r,
+        led_g: g,
+        led_b: b,
+        led_mode: 'static'
+    });
+    saveRecentColor(hex);
 };
 
-// 2. Obsługa trybów animacji
-window.setLedMode = (mode) => {
-    fetch(`/setMode?m=${mode}`)
-        .then(() => {
-            console.log("Tryb zmieniony na:", mode);
-            set(ref(db, 'actuators/led_mode'), mode);
-        });
-};
-
-// 3. Obsługa jasności
-const brightnessSlider = document.getElementById('brightness-slider');
-if (brightnessSlider) {
-    brightnessSlider.oninput = (e) => {
-        const val = parseInt(e.target.value);
-        set(ref(db, 'actuators/brightness'), val);
+// Zmiana trybu LED
+document.querySelectorAll('.effect-btn').forEach(btn => {
+    btn.onclick = () => {
+        const mode = btn.getAttribute('data-mode');
+        update(ref(db, 'actuators'), { led_mode: mode });
     };
+});
+
+// Suwak jasności
+document.getElementById('brightness-slider').oninput = (e) => {
+    set(ref(db, 'actuators/brightness'), parseInt(e.target.value));
+};
+
+// --- POMOCNICZE ---
+
+function updateToggleButton(id, state) {
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.toggle('active', state === true);
 }
 
-// Rozszerzenie funkcji initApp o nasłuchiwanie nowych wartości
-// Dodaj to wewnątrz istniejącej funkcji initApp()
-onValue(ref(db, 'actuators'), (sn) => {
-    const d = sn.val();
-    if (d) {
-        if (d.led_r && d.led_g && d.led_b) {
-            // Konwersja RGB na HEX dla pickera
-            const hex = "#" + ((1 << 24) + (d.led_r << 16) + (d.led_g << 8) + d.led_b).toString(16).slice(1);
-            document.getElementById('color-picker').value = hex;
-        }
-        if (d.brightness) {
-            document.getElementById('brightness-slider').value = d.brightness;
-        }
+function rgbToHex(r, g, b) {
+    return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+function saveRecentColor(hex) {
+    let colors = JSON.parse(localStorage.getItem('recentColors') || '[]');
+    if (!colors.includes(hex)) {
+        colors.unshift(hex);
+        if (colors.length > 5) colors.pop();
+        localStorage.setItem('recentColors', JSON.stringify(colors));
+        renderRecentColors();
     }
+}
+
+function renderRecentColors() {
+    const container = document.getElementById('recent-colors-container');
+    const colors = JSON.parse(localStorage.getItem('recentColors') || '[]');
+    container.innerHTML = '';
+    colors.forEach(hex => {
+        const div = document.createElement('div');
+        div.className = 'color-circle';
+        div.style.backgroundColor = hex;
+        div.onclick = () => updateColor(hex);
+        container.appendChild(div);
+    });
+}
+
+// --- WYKRESY (Chart.js) ---
+let mainChart;
+function initChart() {
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    mainChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: [], datasets: [
+            { label: 'Temp (°C)', borderColor: '#ff3b30', data: [], yAxisID: 'y', tension: 0.4 },
+            { label: 'Wilg (%)', borderColor: '#007aff', data: [], yAxisID: 'y1', tension: 0.4 }
+        ]},
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { type: 'linear', position: 'left' },
+                y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } }
+            }
+        }
+    });
+    updateChartRange(20);
+}
+
+window.updateChartRange = (points) => {
+    const historyRef = query(ref(db, 'history'), limitToLast(points));
+    onValue(historyRef, (sn) => {
+        const d = sn.val();
+        if (!d) return;
+        const labels = [], tData = [], hData = [];
+        Object.keys(d).sort().forEach(k => {
+            const time = new Date(parseInt(k) * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            labels.push(time);
+            tData.push(d[k].t);
+            hData.push(d[k].h);
+        });
+        mainChart.data.labels = labels;
+        mainChart.data.datasets[0].data = tData;
+        mainChart.data.datasets[1].data = hData;
+        mainChart.update();
+    });
+};
+
+// Obsługa przycisków zakresu wykresu
+document.querySelectorAll('.range-btn').forEach(btn => {
+    btn.onclick = () => updateChartRange(parseInt(btn.getAttribute('data-points')));
 });

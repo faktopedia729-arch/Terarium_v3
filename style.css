@@ -1,19 +1,23 @@
-/* --- ZMIENNE I PODSTAWA --- */
+/* --- ZMIENNE I MOTYW --- */
 :root {
     --bg-color: #0f0f12;
     --card-bg: #1a1a1f;
-    --on-color: #27ae60;    /* Soczysty zielony */
-    --off-color: #c0392b;   /* Intensywny czerwony */
+    --on-color: #2ecc71;    /* Zielony sygnałowy */
+    --off-color: #34495e;   /* Ciemny szary dla wyłączonych */
     --accent: #3498db;      /* Niebieski dla czujników */
+    --danger: #e74c3c;      /* Czerwony (Grzanie / Alarm) */
     --text: #ffffff;
-    --text-dim: #b3b3b3;
+    --text-dim: #95a5a6;
     --input-bg: #2c2c34;
+    --shadow: 0 8px 30px rgba(0,0,0,0.5);
 }
+
+* { box-sizing: border-box; }
 
 body {
     background-color: var(--bg-color);
     color: var(--text);
-    font-family: 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
     padding: 20px;
     display: flex;
@@ -22,21 +26,35 @@ body {
 
 .container {
     width: 100%;
-    max-width: 900px;
+    max-width: 850px;
 }
 
-h1 { text-align: center; color: var(--text); font-weight: 300; }
-h2 { font-size: 1.1rem; margin-bottom: 20px; color: var(--text-dim); border-bottom: 1px solid #333; padding-bottom: 10px; }
-h3 { font-size: 1rem; margin-top: 20px; color: var(--accent); }
+header {
+    text-align: center;
+    margin-bottom: 30px;
+}
 
-/* --- KARTY (SEKCJE) --- */
+h1 { font-weight: 300; margin-bottom: 5px; }
+.status-indicator { color: var(--text-dim); font-size: 0.85rem; }
+
+/* --- KARTY --- */
 .card {
-    background: var(--card);
-    border-radius: 20px;
-    padding: 20px;
-    margin-bottom: 25px; /* Zwiększony odstęp między sekcjami */
-    display: block;      /* Zapobiega nakładaniu się */
-    overflow: hidden;    /* Trzyma zawartość wewnątrz krawędzi */
+    background: var(--card-bg);
+    border-radius: 18px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+h2 { 
+    font-size: 1.1rem; 
+    margin-top: 0; 
+    margin-bottom: 20px; 
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 /* --- LOGOWANIE --- */
@@ -45,20 +63,21 @@ h3 { font-size: 1rem; margin-top: 20px; color: var(--accent); }
     top: 0; left: 0; width: 100%; height: 100%;
     background: var(--bg-color);
     display: flex; justify-content: center; align-items: center;
-    z-index: 2000;
+    z-index: 9999;
 }
 
-.login-card { width: 100%; max-width: 350px; }
+.login-card { width: 100%; max-width: 360px; text-align: center; }
+
 .input-field {
-    width: 100%; padding: 12px; margin: 10px 0;
+    width: 100%; padding: 14px; margin: 10px 0;
     background: var(--input-bg); border: 1px solid #444;
-    border-radius: 8px; color: white; box-sizing: border-box;
+    border-radius: 10px; color: white; font-size: 1rem;
 }
 
-/* --- STATUS ŚRODOWISKOWY --- */
+/* --- DASHBOARD (SENSORY) --- */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: 1fr 1fr;
     gap: 20px;
 }
 
@@ -66,164 +85,154 @@ h3 { font-size: 1rem; margin-top: 20px; color: var(--accent); }
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 15px;
+    padding: 20px;
     background: rgba(255,255,255,0.03);
-    border-radius: 12px;
+    border-radius: 15px;
+    transition: transform 0.3s;
 }
 
-.sensor-item i { font-size: 2.5rem; color: var(--accent); margin-bottom: 10px; }
-.sensor-item .val { font-size: 2.2rem; font-weight: bold; }
+.sensor-item:hover { transform: translateY(-5px); }
+.sensor-item i { font-size: 2.2rem; color: var(--accent); margin-bottom: 10px; }
+.sensor-item .val { font-size: 2.5rem; font-weight: 700; letter-spacing: -1px; }
 .sensor-item .lab { color: var(--text-dim); font-size: 0.9rem; margin-top: 5px; }
 
-.full-width { grid-column: 1 / -1; flex-direction: row; gap: 15px; }
-
-/* --- PRZYCISKI STEROWANIA --- */
+/* --- STEROWANIE --- */
 .button-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 15px;
 }
 
 .device-btn {
     border: none;
-    padding: 30px 10px;
-    border-radius: 14px;
-    font-size: 1rem;
+    padding: 25px 10px;
+    border-radius: 16px;
     font-weight: 600;
     color: white;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    background: var(--off-color);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 12px;
-    background-color: var(--off-color); /* Czerwony gdy OFF */
 }
 
-.device-btn i { font-size: 1.8rem; }
+.device-btn i { font-size: 1.6rem; }
 
-/* AKTYWACJA (ZIELONY) */
+/* Stan Aktywny Przycisków */
 .device-btn.active {
-    background-color: var(--on-color);
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(39, 174, 96, 0.3);
+    background: var(--on-color);
+    box-shadow: 0 0 20px rgba(46, 204, 113, 0.3);
 }
 
-.device-btn:hover { filter: brightness(1.1); }
-.device-btn:active { transform: scale(0.95); }
+/* Przycisk Grzania ma inny kolor gdy aktywny */
+#heater-toggle-btn.active {
+    background: var(--danger);
+    box-shadow: 0 0 20px rgba(231, 76, 60, 0.3);
+}
 
-/* --- OŚWIETLENIE I AUTO --- */
-.led-advanced, .form-grid {
-    margin-top: 20px;
+/* --- ZAAWANSOWANE LED --- */
+.led-advanced {
+    margin-top: 30px;
     padding-top: 20px;
-    border-top: 1px solid #333;
+    border-top: 1px solid rgba(255,255,255,0.1);
 }
 
-.led-row, .form-group {
+.led-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
-}
-
-input[type="range"] { width: 60%; cursor: pointer; }
-input[type="color"] { border: none; width: 50px; height: 30px; cursor: pointer; background: none; }
-input[type="number"] {
-    background: var(--input-bg); color: white; border: 1px solid #444;
-    padding: 8px; border-radius: 5px; width: 80px; text-align: center;
-}
-
-.time-inputs { display: flex; align-items: center; gap: 5px; }
-
-/* --- PRZYCISKI AKCJI --- */
-.action-btn {
-    width: 100%;
-    padding: 15px;
-    border-radius: 10px;
-    border: none;
-    background: var(--accent);
-    color: white;
-    font-weight: bold;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: 0.2s;
-    margin-bottom: 15px;
-}
-
-.auto-toggle { background: #8e44ad; }
-.save-btn { background: #34495e; margin-top: 10px; }
-.action-btn:hover { opacity: 0.9; transform: translateY(-2px); }
-
-/* --- WYKRES --- */
-.chart-container {
-    position: relative;
-    height: 350px; 
-    width: 100%;
     margin-bottom: 20px;
 }
-/* --- RESPONSYWNOŚĆ --- */
-@media (max-width: 600px) {
-    body { padding: 10px; }
-    .dashboard-grid { grid-template-columns: 1fr 1fr; }
-    .sensor-item .val { font-size: 1.5rem; }
-    .button-grid { grid-template-columns: 1fr 1fr; }
-    .form-group { flex-direction: column; align-items: flex-start; gap: 10px; }
-    input[type="range"] { width: 100%; }
-}
-.range-btn {
-    background: #252836; border: 1px solid #444; color: white;
-    padding: 5px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem;
-}
-.range-btn:hover { background: var(--accent); }
 
-/* --- NOWE STYLE DLA EFEKTÓW LED --- */
+.recent-colors { display: flex; gap: 8px; }
+.color-circle {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.2);
+    cursor: pointer;
+    transition: scale 0.2s;
+}
+.color-circle:hover { scale: 1.1; }
 
 .effects-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
-    margin: 15px 0;
 }
 
 .effect-btn {
     background: var(--input-bg);
-    border: 1px solid #444;
+    border: 1px solid rgba(255,255,255,0.1);
     color: white;
-    padding: 12px 5px;
+    padding: 12px;
     border-radius: 10px;
     cursor: pointer;
-    font-size: 0.85rem;
-    transition: 0.3s;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-}
-
-.effect-btn:hover {
-    background: #3a3a45;
-    border-color: var(--accent);
+    transition: 0.2s;
 }
 
 .effect-btn.active {
     background: var(--accent);
-    box-shadow: 0 0 15px rgba(52, 152, 219, 0.4);
+    border-color: white;
 }
 
-/* Poprawka dla suwaka jasności */
-#brightness-slider {
+/* --- SUWAK JASNOŚCI --- */
+input[type="range"] {
     -webkit-appearance: none;
-    height: 8px;
-    background: #333;
+    width: 65%;
+    height: 6px;
+    background: #444;
     border-radius: 5px;
-    outline: none;
 }
 
-#brightness-slider::-webkit-slider-thumb {
+input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
+    width: 20px; height: 20px;
     background: var(--accent);
     border-radius: 50%;
     cursor: pointer;
+}
+
+/* --- WYKRESY --- */
+.chart-container {
+    height: 300px;
+    margin-top: 10px;
+}
+
+.chart-controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.range-btn {
+    background: var(--input-bg);
+    border: 1px solid #444;
+    color: var(--text-dim);
+    padding: 6px 15px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.range-btn:hover { color: white; border-color: var(--accent); }
+
+/* --- AKCJE --- */
+.action-btn {
+    width: 100%; padding: 15px;
+    background: var(--accent);
+    color: white; border: none;
+    border-radius: 12px; font-weight: bold;
+    cursor: pointer; font-size: 1rem;
+}
+
+/* --- RESPONSYWNOŚĆ --- */
+@media (max-width: 600px) {
+    body { padding: 10px; }
+    .val { font-size: 1.8rem !important; }
+    .button-grid { grid-template-columns: 1fr 1fr; }
+    .effects-grid { grid-template-columns: 1fr; }
+    input[type="range"] { width: 50%; }
 }

@@ -7,17 +7,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="style.css">
-    <style>
-        /* Dodatkowe style dla nowych funkcji */
-        .recent-colors { display: flex; gap: 10px; margin-top: 10px; }
-        .color-circle { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #444; cursor: pointer; }
-        .effects-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .effect-btn { padding: 10px; border: none; border-radius: 8px; background: #333; color: white; cursor: pointer; transition: 0.3s; }
-        .effect-btn:hover { background: #555; }
-        .effect-btn.active { background: #ff9800; color: black; font-weight: bold; }
-    </style>
 </head>
 <body>
+
     <div id="login-form" class="login-overlay">
         <div class="card login-card">
             <h2><i class="fas fa-lock"></i> Autoryzacja</h2>
@@ -30,13 +22,25 @@
 
     <div class="container" id="app-container" style="display: none;">
         <header>
-            <h1>🦎 Inteligentne Terrarium IoT</h1>
-            <div id="notification-bar" class="notification"></div>
+            <h1>🦎 Terrarium IoT Pro</h1>
+            <div id="connection-status" class="status-indicator">Inicjalizacja systemu...</div>
         </header>
         
+        <section class="card dashboard-grid">
+            <div class="sensor-item">
+                <i class="fas fa-thermometer-half"></i>
+                <div class="val"><span id="temperature">--.-</span>°C</div>
+                <div class="lab">Temperatura</div>
+            </div>
+            <div class="sensor-item">
+                <i class="fas fa-tint"></i>
+                <div class="val"><span id="humidity">--</span>%</div>
+                <div class="lab">Wilgotność</div>
+            </div>
+        </section>
+
         <section class="card control-section">
-            <h2><i class="fas fa-sliders-h"></i> Sterowanie Manualne</h2>
-            <button id="auto-toggle-btn" class="action-btn auto-toggle">Przełącz na AUTO</button>
+            <h2><i class="fas fa-sliders-h"></i> Sterowanie Urządzeniami</h2>
             
             <div class="button-grid">
                 <button id="heater-toggle-btn" class="device-btn"><i class="fas fa-fire"></i> Grzanie</button>
@@ -46,25 +50,24 @@
             </div>
             
             <div class="led-advanced">
-                <h3>Oświetlenie Pro</h3>
+                <h3>Oświetlenie RGB</h3>
                 
                 <div class="led-row">
                      <span>Kolor:</span>
-                     <input type="color" id="color-picker" value="#FFFFFF" onchange="handleColorChange(this.value)">
+                     <input type="color" id="color-picker" value="#FFFFFF">
                 </div>
 
                 <div class="led-row">
                     <span>Ostatnie:</span>
-                    <div id="recent-colors-container" class="recent-colors">
-                        </div>
+                    <div id="recent-colors-container" class="recent-colors"></div>
                 </div>
 
                 <h3>Efekty i Atmosfera</h3>
                 <div class="effects-grid">
-                    <button class="effect-btn" onclick="setLedMode('static')">Stały Kolor</button>
-                    <button class="effect-btn" onclick="setLedMode('fire')">🔥 Ognisko</button>
-                    <button class="effect-btn" onclick="setLedMode('storm')">⚡ Burza</button>
-                    <button class="effect-btn" onclick="setLedMode('sunrise')">🌅 Wschód</button>
+                    <button id="btn-mode-static" class="effect-btn" data-mode="static">Stały Kolor</button>
+                    <button id="btn-mode-fire" class="effect-btn" data-mode="fire">🔥 Ognisko</button>
+                    <button id="btn-mode-storm" class="effect-btn" data-mode="storm">⚡ Burza</button>
+                    <button id="btn-mode-sunrise" class="effect-btn" data-mode="sunrise">🌅 Wschód</button>
                 </div>
 
                 <div class="led-row" style="margin-top:20px">
@@ -74,66 +77,18 @@
             </div>
         </section>
 
-        </div>
+        <section class="card chart-section">
+            <h2><i class="fas fa-chart-line"></i> Historia 24h</h2>
+            <div class="chart-container">
+                <canvas id="mainChart"></canvas>
+            </div>
+            <div class="chart-controls">
+                <button class="range-btn" data-points="20">Krótka historia</button>
+                <button class="range-btn" data-points="100">Pełna historia</button>
+            </div>
+        </section>
+    </div>
 
-    <script type="module">
-        // --- LOGIKA JS DLA NOWYCH FUNKCJI ---
-        
-        // Zapisywanie 3 ostatnich kolorów w LocalStorage
-        function saveRecentColor(hex) {
-            let colors = JSON.parse(localStorage.getItem('recentColors') || '[]');
-            if (!colors.includes(hex)) {
-                colors.unshift(hex);
-                if (colors.length > 3) colors.pop();
-                localStorage.setItem('recentColors', JSON.stringify(colors));
-                renderRecentColors();
-            }
-        }
-
-        function renderRecentColors() {
-            const container = document.getElementById('recent-colors-container');
-            const colors = JSON.parse(localStorage.getItem('recentColors') || '[]');
-            container.innerHTML = '';
-            colors.forEach(hex => {
-                const div = document.createElement('div');
-                div.className = 'color-circle';
-                div.style.backgroundColor = hex;
-                div.onclick = () => {
-                    document.getElementById('color-picker').value = hex;
-                    handleColorChange(hex);
-                };
-                container.appendChild(div);
-            });
-        }
-
-        // Funkcja wysyłająca kolor do NodeMCU
-        window.handleColorChange = function(hex) {
-            const r = parseInt(hex.substring(1, 3), 16);
-            const g = parseInt(hex.substring(3, 5), 16);
-            const b = parseInt(hex.substring(5, 7), 16);
-            
-            saveRecentColor(hex);
-            
-            // Wysyłka do lokalnego serwera NodeMCU
-            fetch(`/setColor?r=${r}&g=${g}&b=${b}`)
-                .then(() => console.log("Kolor wysłany: ", hex))
-                .catch(err => console.error("Błąd połączenia z NodeMCU"));
-        }
-
-        // Funkcja zmieniająca tryb (mode)
-        window.setLedMode = function(mode) {
-            fetch(`/setMode?m=${mode}`)
-                .then(() => {
-                    // Wizualne zaznaczenie aktywnego przycisku
-                    document.querySelectorAll('.effect-btn').forEach(btn => btn.classList.remove('active'));
-                    event.target.classList.add('active');
-                });
-        }
-
-        // Inicjalizacja przy starcie
-        window.onload = () => {
-            renderRecentColors();
-        };
-    </script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>
