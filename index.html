@@ -11,6 +11,28 @@
 <body>
 
     <div id="login-form" class="login-overlay">
+        <div id="offline-overlay" class="login-overlay" style="display: none; background: rgba(0,0,0,0.95); z-index: 2000;">
+        <div class="card login-card" style="border: 2px solid #e74c3c; text-align: center; position: relative; max-width: 90%; width: 400px;">
+            
+            <button id="dismiss-offline-btn" style="position: absolute; top: 5px; right: 15px; background: none; border: none; color: #fff; font-size: 1.8rem; cursor: pointer; padding: 5px;">
+                <i class="fas fa-times"></i>
+            </button>
+
+            <h2 style="color: #e74c3c; font-size: 3rem; margin-bottom: 10px; margin-top: 20px;">
+                <i class="fas fa-unlink"></i>
+            </h2>
+            <h2 style="color: #e74c3c; margin-bottom: 15px;">BRAK POŁĄCZENIA</h2>
+            
+            <p style="color: #ddd; margin-bottom: 20px;">
+                System nie odbiera danych z NodeMCU.<br>
+                Możesz zamknąć to okno, aby zobaczyć historię.
+            </p>
+
+            <p style="font-size: 0.8rem; color: #888;">
+                Bieżące odczyty zostaną ukryte (--).
+            </p>
+        </div>
+    </div>
         <div class="card login-card">
             <h2><i class="fas fa-lock"></i> Autoryzacja</h2>
             <input type="email" id="login-email" placeholder="Email" class="input-field">
@@ -82,38 +104,55 @@
 
         <section class="card automation-settings">
             <h2><i class="fas fa-robot"></i> Automatyzacja & Harmonogram</h2>
-            <div class="button-grid" style="margin-bottom: 25px;">
+            
+            <div class="button-grid" style="margin-bottom: 15px;">
                 <button id="auto-mode-toggle-btn" class="device-btn">
                     <i class="fas fa-robot"></i> Tryb AUTO
                 </button>
             </div>
 
-            <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+            <h3 style="text-align: center; color: #f1c40f; margin: 10px 0; text-transform: uppercase; letter-spacing: 2px;">
+                <i class="fas fa-sun"></i> DZIEŃ
+            </h3>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px;">
                 <div class="form-group">
-                    <label>Temperatura Celowa (°C)</label>
-                    <input type="number" id="target-temp-input" step="0.5" class="input-field" placeholder="np. 28.0">
-                </div>
-                <div class="form-group">
-                    <label>Wilgotność Celowa (%)</label>
-                    <input type="number" id="target-hum-input" step="1" class="input-field" placeholder="np. 65">
-                </div>
-                <div class="form-group">
-                    <label>Margines Wilgotności (+/- %)</label>
-                    <input type="number" id="hum-margin-input" step="1" class="input-field" placeholder="np. 5">
+                    <label>Temp (°C)</label>
+                    <input type="number" id="day-temp-input" step="0.5" class="input-field" placeholder="28.0">
                 </div>
                 <div class="form-group">
-                    <label>Włączenie LED (godz:min)</label>
-                    <input type="time" id="led-on-time" class="input-field">
+                    <label>Wilg (%)</label>
+                    <input type="number" id="day-hum-input" step="1" class="input-field" placeholder="60">
                 </div>
                 <div class="form-group">
-                    <label>Wyłączenie LED (godz:min)</label>
-                    <input type="time" id="led-off-time" class="input-field">
+                    <label>Start (godz)</label>
+                    <input type="time" id="day-start-time" class="input-field">
                 </div>
-                <div class="form-group" style="grid-column: 1 / -1;">
-                    <button id="save-settings-btn" class="action-btn" style="background: #27ae60; margin-top: 10px;">
-                        <i class="fas fa-save"></i> ZAPISZ WSZYSTKIE USTAWIENIA
-                    </button>
+            </div>
+
+            <h3 style="text-align: center; color: #3498db; margin: 10px 0; text-transform: uppercase; letter-spacing: 2px;">
+                <i class="fas fa-moon"></i> NOC
+            </h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                <div class="form-group">
+                    <label>Temp (°C)</label>
+                    <input type="number" id="night-temp-input" step="0.5" class="input-field" placeholder="22.0">
                 </div>
+                <div class="form-group">
+                    <label>Wilg (%)</label>
+                    <input type="number" id="night-hum-input" step="1" class="input-field" placeholder="80">
+                </div>
+                <div class="form-group">
+                    <label>Start (godz)</label>
+                    <input type="time" id="night-start-time" class="input-field">
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 15px;">
+                <button id="save-settings-btn" class="action-btn" style="background: #27ae60; width: 100%;">
+                    <i class="fas fa-save"></i> ZAPISZ HARMONOGRAM
+                </button>
             </div>
         </section>
 
@@ -129,7 +168,13 @@
             </div>
         </section>
     </div>
-
+    <section class="card" style="border: 1px solid #c0392b; margin-top: 20px;">
+            <h2 style="color: #c0392b; font-size: 1.2rem;"><i class="fas fa-tools"></i> Zarządzanie Systemem</h2>
+            <p style="font-size: 0.8rem; color: #aaa; margin-bottom: 10px;">Użyj w razie zawieszenia się odczytów.</p>
+            <button id="reset-device-btn" class="action-btn" style="background: #c0392b; width: 100%;">
+                <i class="fas fa-power-off"></i> ZDALNY RESTART NODEMCU
+            </button>
+        </section>
     <script type="module" src="script.js"></script>
 </body>
 </html>
