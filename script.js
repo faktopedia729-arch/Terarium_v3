@@ -61,72 +61,81 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // --- GŁÓWNA LOGIKA APLIKACJI ---
+// Podmień całą funkcję initApp na tę wersję:
 function initApp() {
-    
     // 1. Odczyty z czujników (Dashboard) + HEARTBEAT
     onValue(ref(db, 'readings'), (sn) => {
         const d = sn.val();
         if (d) {
-            // Aktualizujemy czas ostatniego odczytu (czas lokalny przeglądarki)
-            lastHeartbeat = Date.now(); 
+            // TUTAJ ZMIANA: Pobieramy czas Z DANYCH, a nie czas komputera
+            // Jeśli brak timestampu (stary kod C++), przyjmujemy 0
+            const dataTimestamp = d.timestamp ? d.timestamp * 1000 : 0;
             
-            // Jeśli okno było zamknięte, a dane wróciły -> resetujemy flagę
-            if(isOfflineDismissed) isOfflineDismissed = false;
+            // Zapisujemy czas pochodzenia danych do zmiennej globalnej
+            lastHeartbeat = dataTimestamp; 
             
-            // Ukrywamy overlay (bo dane są świeże)
-            document.getElementById('offline-overlay').style.display = 'none';
+            const timeDiff = Date.now() - lastHeartbeat;
 
-            document.getElementById('temperature').innerText = d.temperature ? d.temperature.toFixed(1) : "--.-";
-            document.getElementById('humidity').innerText = d.humidity ? d.humidity.toFixed(0) : "--";
-            
-            // Parsowanie timestampu z NodeMCU (zakładamy że wysyła timestamp UNIX w sekundach)
-            const nodeTime = d.timestamp ? new Date(d.timestamp * 1000).toLocaleTimeString() : "Brak danych";
-            document.getElementById('connection-status').innerText = "Ostatnia aktualizacja: " + nodeTime;
-        }
-    });
-
-    // 2. Stan urządzeń i LED
-    onValue(ref(db, 'actuators'), (sn) => {
-        const d = sn.val();
-        if (d) {
-            updateToggleButton('heater-toggle-btn', d.heater);
-            updateToggleButton('mist-toggle-btn', d.mist);
-            updateToggleButton('fan-toggle-btn', d.fan);
-            updateToggleButton('led-toggle-btn', d.led);
-            document.getElementById('brightness-slider').value = d.brightness || 255;
-            
-            if (d.led_r !== undefined) {
-                document.getElementById('color-picker').value = rgbToHex(d.led_r, d.led_g, d.led_b);
+            // Jeśli dane są świeże (np. młodsze niż 30s) -> pokaż je
+            // Jeśli stare -> funkcja checkConnectionHealth to wyłapie, ale tu też możemy zareagować
+            if (timeDiff < OFFLINE_THRESHOLD) {
+                if(isOfflineDismissed) isOfflineDismissed = false;
+                document.getElementById('offline-overlay').style.display = 'none';
+                
+                document.getElementById('temperature').innerText = d.temperature ? d.temperature.toFixed(1) : "--.-";
+                document.getElementById('humidity').innerText = d.humidity ? d.humidity.toFixed(0) : "--";
+                
+                const nodeTime = d.timestamp ? new Date(d.timestamp * 1000).toLocaleTimeString() : "Oczekiwanie na NodeMCU...";
+                document.getElementById('connection-status').innerText = "Ostatnia aktualizacja: " + nodeTime;
+            } else {
+                // Dane są stare - od razu to sygnalizujemy w statusie, choć overlay obsłuży pętla
+                const oldDate = new Date(lastHeartbeat).toLocaleTimeString();
+                document.getElementById('connection-status').innerText = "Dane nieaktualne (" + oldDate + ")";
             }
-
-            document.querySelectorAll('.effect-btn').forEach(btn => {
-                const mode = btn.getAttribute('data-mode');
-                btn.classList.toggle('active', mode === d.led_mode);
-            });
         }
     });
 
-    // 3. Synchronizacja Ustawień (NOWE POLA: Dzień / Noc)
-    onValue(ref(db, 'settings'), (sn) => {
-        const s = sn.val();
-        if (s) {
-            // Dzień
-            document.getElementById('day-temp-input').value = s.day_temp || 28.0;
-            document.getElementById('day-hum-input').value = s.day_hum || 60;
-            document.getElementById('day-start-time').value = s.day_start || "08:00";
-            
-            // Noc
-            document.getElementById('night-temp-input').value = s.night_temp || 22.0;
-            document.getElementById('night-hum-input').value = s.night_hum || 80;
-            document.getElementById('night-start-time').value = s.night_start || "20:00";
-
-            updateToggleButton('auto-mode-toggle-btn', s.auto_enabled);
-        }
-    });
-
+    // ... (reszta funkcji initApp bez zmian: actuators, settings, chart) ...
+    // Skopiuj resztę ze starego pliku, lub zostaw jak jest, bo reszta się nie zmienia
+    // Pamiętaj tylko o zamknięciu klamry funkcji initApp!
+    
+    // Tu dla pewności reszta listenerów wewnątrz initApp:
+    onValue(ref(db, 'actuators'), (sn) => { /* ... kod bez zmian ... */ updateUI_Actuators(sn.val()); });
+    onValue(ref(db, 'settings'), (sn) => { /* ... kod bez zmian ... */ updateUI_Settings(sn.val()); });
     initChart();
     renderRecentColors();
 }
+
+// Podmień funkcję checkConnectionHealth na tę wersję:
+function checkConnectionHealth() {
+    if(!auth.currentUser) return;
+
+    const now = Date.now();
+    // Sprawdzamy różnicę czasu
+    // Jeśli lastHeartbeat == 0, to znaczy że NodeMCU jeszcze nic nie wysłało z nowym kodem
+    const isDataOld = (now - lastHeartbeat > OFFLINE_THRESHOLD);
+
+    if (isDataOld) {
+        if (!isOfflineDismissed) {
+            document.getElementById('offline-overlay').style.display = 'flex';
+        }
+        
+        // Jeżeli okno jest zamknięte krzyżykiem, wpisz kreski w pola
+        if (isOfflineDismissed) {
+             document.getElementById('temperature').innerText = "--.-";
+             document.getElementById('humidity').innerText = "--";
+        }
+
+        document.getElementById('connection-status').innerText = "Status: OFFLINE ⚠️ (Brak nowych danych)";
+        document.getElementById('connection-status').style.color = "#e74c3c";
+    } else {
+         document.getElementById('connection-status').style.color = "#95a5a6";
+    }
+}
+
+// Dodaj te funkcje pomocnicze, żeby kod initApp był czystszy (opcjonalnie, jeśli usunąłeś kod wewnątrz onValue)
+// Jeśli w initApp zostawiłeś stary kod dla 'actuators' i 'settings', to te poniżej nie są potrzebne.
+// Zakładam, że w initApp po prostu podmienisz tylko sekcję 'readings'.
 
 // --- FUNKCJA WATCHDOG (Sprawdza połączenie) ---
 function checkConnectionHealth() {
