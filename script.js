@@ -15,8 +15,16 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
+// --- ZMIENNE POMOCNICZE ---
+let lastHeartbeat = 0; // Kiedy ostatnio przyszły dane (timestamp z PC/telefonu)
+let isOfflineDismissed = false; // Czy użytkownik zamknął okno błędu
+const OFFLINE_THRESHOLD = 30000; // 30 sekund bez danych = OFFLINE
+
 // --- OBSŁUGA LOGOWANIA I STARTU ---
 window.addEventListener('DOMContentLoaded', () => {
+    // Timer sprawdzający połączenie co 5 sekund
+    setInterval(checkConnectionHealth, 5000);
+
     const loginBtn = document.getElementById('login-btn');
     if (loginBtn) {
         loginBtn.addEventListener('click', (e) => {
@@ -28,6 +36,15 @@ window.addEventListener('DOMContentLoaded', () => {
                 .catch(error => alert("Błąd logowania: " + error.message));
         });
     }
+
+    // Obsługa zamknięcia okna offline
+    document.getElementById('dismiss-offline-btn').addEventListener('click', () => {
+        document.getElementById('offline-overlay').style.display = 'none';
+        isOfflineDismissed = true;
+        // Ustawiamy kreski, żeby nie mylić użytkownika
+        document.getElementById('temperature').innerText = "--.-";
+        document.getElementById('humidity').innerText = "--";
+    });
 });
 
 onAuthStateChanged(auth, (user) => {
@@ -45,13 +62,26 @@ onAuthStateChanged(auth, (user) => {
 
 // --- GŁÓWNA LOGIKA APLIKACJI ---
 function initApp() {
-    // 1. Odczyty z czujników (Dashboard)
+    
+    // 1. Odczyty z czujników (Dashboard) + HEARTBEAT
     onValue(ref(db, 'readings'), (sn) => {
         const d = sn.val();
         if (d) {
-            document.getElementById('temperature').innerText = d.temperature.toFixed(1);
-            document.getElementById('humidity').innerText = d.humidity.toFixed(0);
-            document.getElementById('connection-status').innerText = "Ostatnia aktualizacja: " + (d.last_sync || "teraz");
+            // Aktualizujemy czas ostatniego odczytu (czas lokalny przeglądarki)
+            lastHeartbeat = Date.now(); 
+            
+            // Jeśli okno było zamknięte, a dane wróciły -> resetujemy flagę
+            if(isOfflineDismissed) isOfflineDismissed = false;
+            
+            // Ukrywamy overlay (bo dane są świeże)
+            document.getElementById('offline-overlay').style.display = 'none';
+
+            document.getElementById('temperature').innerText = d.temperature ? d.temperature.toFixed(1) : "--.-";
+            document.getElementById('humidity').innerText = d.humidity ? d.humidity.toFixed(0) : "--";
+            
+            // Parsowanie timestampu z NodeMCU (zakładamy że wysyła timestamp UNIX w sekundach)
+            const nodeTime = d.timestamp ? new Date(d.timestamp * 1000).toLocaleTimeString() : "Brak danych";
+            document.getElementById('connection-status').innerText = "Ostatnia aktualizacja: " + nodeTime;
         }
     });
 
@@ -76,21 +106,44 @@ function initApp() {
         }
     });
 
-    // 3. Synchronizacja Ustawień (Zapobiega znikaniu danych w polach)
+    // 3. Synchronizacja Ustawień (NOWE POLA: Dzień / Noc)
     onValue(ref(db, 'settings'), (sn) => {
         const s = sn.val();
         if (s) {
-            document.getElementById('target-temp-input').value = s.target_temp || 28;
-            document.getElementById('target-hum-input').value = s.target_hum || 60;
-            document.getElementById('hum-margin-input').value = s.hum_margin || 5;
-            document.getElementById('led-on-time').value = s.led_on || "08:00";
-            document.getElementById('led-off-time').value = s.led_off || "20:00";
+            // Dzień
+            document.getElementById('day-temp-input').value = s.day_temp || 28.0;
+            document.getElementById('day-hum-input').value = s.day_hum || 60;
+            document.getElementById('day-start-time').value = s.day_start || "08:00";
+            
+            // Noc
+            document.getElementById('night-temp-input').value = s.night_temp || 22.0;
+            document.getElementById('night-hum-input').value = s.night_hum || 80;
+            document.getElementById('night-start-time').value = s.night_start || "20:00";
+
             updateToggleButton('auto-mode-toggle-btn', s.auto_enabled);
         }
     });
 
     initChart();
     renderRecentColors();
+}
+
+// --- FUNKCJA WATCHDOG (Sprawdza połączenie) ---
+function checkConnectionHealth() {
+    // Jeśli nie jesteśmy zalogowani, ignoruj
+    if(!auth.currentUser) return;
+
+    const now = Date.now();
+    // Jeśli minęło więcej niż 30s od ostatnich danych i nie zamknięto ręcznie okna
+    if (lastHeartbeat > 0 && (now - lastHeartbeat > OFFLINE_THRESHOLD)) {
+        if (!isOfflineDismissed) {
+            document.getElementById('offline-overlay').style.display = 'flex';
+        }
+        document.getElementById('connection-status').innerText = "Status: OFFLINE ⚠️";
+        document.getElementById('connection-status').style.color = "#e74c3c";
+    } else {
+         document.getElementById('connection-status').style.color = "#95a5a6";
+    }
 }
 
 // --- FUNKCJE STERUJĄCE ---
@@ -108,6 +161,15 @@ document.getElementById('mist-toggle-btn').onclick = () => toggleFirebase('actua
 document.getElementById('fan-toggle-btn').onclick = () => toggleFirebase('actuators/fan');
 document.getElementById('led-toggle-btn').onclick = () => toggleFirebase('actuators/led');
 document.getElementById('auto-mode-toggle-btn').onclick = () => toggleFirebase('settings/auto_enabled');
+
+// ZDALNY RESET
+document.getElementById('reset-device-btn').onclick = () => {
+    if(confirm("Czy na pewno chcesz zrestartować NodeMCU?")) {
+        set(ref(db, 'system/reset'), true)
+        .then(() => alert("Wysłano komendę resetu."))
+        .catch((e) => alert("Błąd: " + e.message));
+    }
+};
 
 // Obsługa Kolorów
 document.getElementById('apply-color-btn').onclick = () => {
@@ -140,17 +202,22 @@ document.querySelectorAll('.effect-btn').forEach(btn => {
     };
 });
 
-// ZAPIS WSZYSTKICH USTAWIEŃ
+// ZAPIS NOWYCH USTAWIEŃ (Harmonogram)
 document.getElementById('save-settings-btn').onclick = () => {
     const updates = {
-        target_temp: parseFloat(document.getElementById('target-temp-input').value),
-        target_hum: parseFloat(document.getElementById('target-hum-input').value),
-        hum_margin: parseFloat(document.getElementById('hum-margin-input').value),
-        led_on: document.getElementById('led-on-time').value,
-        led_off: document.getElementById('led-off-time').value
+        // Dzień
+        day_temp: parseFloat(document.getElementById('day-temp-input').value),
+        day_hum: parseInt(document.getElementById('day-hum-input').value),
+        day_start: document.getElementById('day-start-time').value,
+        
+        // Noc
+        night_temp: parseFloat(document.getElementById('night-temp-input').value),
+        night_hum: parseInt(document.getElementById('night-hum-input').value),
+        night_start: document.getElementById('night-start-time').value
     };
+    
     update(ref(db, 'settings'), updates)
-        .then(() => alert("Ustawienia zapisane pomyślnie!"))
+        .then(() => alert("Harmonogram zapisany!"))
         .catch(err => alert("Błąd zapisu: " + err.message));
 };
 
@@ -188,7 +255,7 @@ function renderRecentColors() {
     });
 }
 
-// --- WYKRESY (Poprawione zakresy 4h, 12h, 24h) ---
+// --- WYKRESY ---
 let mainChart;
 function initChart() {
     const canvas = document.getElementById('mainChart');
@@ -197,18 +264,18 @@ function initChart() {
     mainChart = new Chart(ctx, {
         type: 'line',
         data: { labels: [], datasets: [
-            { label: 'Temp (°C)', borderColor: '#ff3b30', data: [], yAxisID: 'y', tension: 0.3, fill: true, backgroundColor: 'rgba(255, 59, 48, 0.1)' },
-            { label: 'Wilg (%)', borderColor: '#007aff', data: [], yAxisID: 'y1', tension: 0.3, fill: true, backgroundColor: 'rgba(0, 122, 255, 0.1)' }
+            { label: 'Temp (°C)', borderColor: '#e74c3c', data: [], yAxisID: 'y', tension: 0.4 },
+            { label: 'Wilg (%)', borderColor: '#3498db', data: [], yAxisID: 'y1', tension: 0.4 }
         ]},
         options: {
             responsive: true, maintainAspectRatio: false,
             scales: { 
-                y: { type: 'linear', position: 'left', grid: { color: 'rgba(255,255,255,0.05)' } }, 
+                y: { type: 'linear', position: 'left' }, 
                 y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } } 
             }
         }
     });
-    updateChartRange(24); // Start: ostatnie 24 punkty
+    updateChartRange(24);
 }
 
 window.updateChartRange = (points) => {
