@@ -66,13 +66,9 @@ function initApp() {
     onValue(ref(db, 'readings'), (sn) => {
         const d = sn.val();
         if (d) {
-            // TUTAJ ZMIANA: Pobieramy czas Z DANYCH. Jeśli brak timestampu -> 0.
             const dataTimestamp = d.timestamp ? d.timestamp * 1000 : 0;
-            
-            // Zapisujemy czas pochodzenia danych
             lastHeartbeat = dataTimestamp; 
             
-            // Sprawdzamy czy dane są świeże
             const timeDiff = Date.now() - lastHeartbeat;
             const isFresh = timeDiff < OFFLINE_THRESHOLD;
 
@@ -88,14 +84,11 @@ function initApp() {
                 document.getElementById('connection-status').innerText = "Ostatnia aktualizacja: " + nodeTime;
                 document.getElementById('connection-status').style.color = "#95a5a6";
             } else {
-                // DANE STARE -> Ukrywamy liczby
-                
-                // Jeśli użytkownik nie zamknął wcześniej okna X-em, pokaż overlay
+                // DANE STARE
                 if (!isOfflineDismissed) {
                     document.getElementById('offline-overlay').style.display = 'flex';
                 }
 
-                // ZAWSZE wstawiamy kreski, gdy dane są stare
                 document.getElementById('temperature').innerText = "--.-";
                 document.getElementById('humidity').innerText = "--";
                 
@@ -113,7 +106,11 @@ function initApp() {
             updateToggleButton('mist-toggle-btn', d.mist);
             updateToggleButton('fan-toggle-btn', d.fan);
             updateToggleButton('led-toggle-btn', d.led);
-            document.getElementById('brightness-slider').value = d.brightness || 255;
+            
+            // Suwak jasności taśmy LED
+            if (d.brightness !== undefined) {
+                document.getElementById('brightness-slider').value = d.brightness;
+            }
             
             if (d.led_r !== undefined) {
                 document.getElementById('color-picker').value = rgbToHex(d.led_r, d.led_g, d.led_b);
@@ -126,7 +123,7 @@ function initApp() {
         }
     });
 
-    // 3. Synchronizacja Ustawień
+    // 3. Synchronizacja Ustawień (W TYM JASNOŚĆ EKRANU TFT)
     onValue(ref(db, 'settings'), (sn) => {
         const s = sn.val();
         if (s) {
@@ -141,6 +138,11 @@ function initApp() {
             document.getElementById('night-start-time').value = s.night_start || "20:00";
 
             updateToggleButton('auto-mode-toggle-btn', s.auto_enabled);
+
+            // NOWOŚĆ: Synchronizacja suwaka jasności ekranu z bazą
+            if (s.lcd_brightness !== undefined) {
+                document.getElementById('screen-brightness-slider').value = s.lcd_brightness;
+            }
         }
     });
 
@@ -148,12 +150,11 @@ function initApp() {
     renderRecentColors();
 }
 
-// --- FUNKCJA WATCHDOG (Sprawdza połączenie okresowo) ---
+// --- FUNKCJA WATCHDOG ---
 function checkConnectionHealth() {
     if(!auth.currentUser) return;
 
     const now = Date.now();
-    // Sprawdzamy różnicę czasu
     const isDataOld = (now - lastHeartbeat > OFFLINE_THRESHOLD);
 
     if (isDataOld) {
@@ -161,7 +162,6 @@ function checkConnectionHealth() {
             document.getElementById('offline-overlay').style.display = 'flex';
         }
         
-        // Jeżeli dane zestarzały się w trakcie oglądania strony -> kreski
         document.getElementById('temperature').innerText = "--.-";
         document.getElementById('humidity').innerText = "--";
 
@@ -208,6 +208,7 @@ window.updateColor = (hex) => {
     const g = parseInt(hex.substring(3, 5), 16);
     const b = parseInt(hex.substring(5, 7), 16);
 
+    // Tu jest FIX: led: true włącza pasek przy zmianie koloru
     update(ref(db, 'actuators'), {
         led_r: r, led_g: g, led_b: b, 
         led_mode: 'static',
@@ -216,14 +217,25 @@ window.updateColor = (hex) => {
     saveRecentColor(hex);
 };
 
-// Jasność i Tryby
-document.getElementById('brightness-slider').oninput = (e) => {
+// Jasność Taśmy LED (Używamy onchange żeby nie spamować bazy)
+document.getElementById('brightness-slider').onchange = (e) => {
     set(ref(db, 'actuators/brightness'), parseInt(e.target.value));
 };
 
+// NOWOŚĆ: Jasność Ekranu TFT (Używamy onchange)
+const screenSlider = document.getElementById('screen-brightness-slider');
+if (screenSlider) {
+    screenSlider.onchange = (e) => {
+        // Zapisujemy do SETTINGS, nie actuators
+        update(ref(db, 'settings'), { lcd_brightness: parseInt(e.target.value) });
+    };
+}
+
+// Tryby Efektów
 document.querySelectorAll('.effect-btn').forEach(btn => {
     btn.onclick = () => {
         const mode = btn.getAttribute('data-mode');
+        // Tu jest FIX: led: true włącza pasek przy zmianie trybu
         update(ref(db, 'actuators'), { led_mode: mode, led: true });
     };
 });
