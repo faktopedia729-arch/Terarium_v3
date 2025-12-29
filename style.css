@@ -206,23 +206,62 @@ h3 {
     color: var(--text-dim);
 }
 
-/* --- SUWAK JASNOŚCI --- */
+/* --- SUWAKI (LED i TFT) --- */
 input[type="range"] {
     -webkit-appearance: none;
-    width: 65%;
-    height: 6px;
-    background: #444;
+    width: 100%; /* Zmieniono na 100% dla lepszego wyglądu w kontenerze */
+    height: 8px; /* Nieco grubszy */
+    background: #333;
     border-radius: 5px;
+    outline: none;
+    transition: background 0.3s;
 }
 
+/* Stylizacja "kciuka" (tego co przesuwasz) */
 input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 20px; height: 20px;
-    background: var(--accent);
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    background: var(--accent); /* Niebieski */
+    border: 2px solid #fff; /* Biała obwódka dla kontrastu */
     border-radius: 50%;
     cursor: pointer;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    transition: transform 0.1s, background 0.2s;
 }
 
+input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+/* Specyficzny kolor dla suwaka jasności LED (żeby odróżnić od ekranu) */
+#brightness-slider::-webkit-slider-thumb {
+    background: #f1c40f; /* Żółty dla LEDów */
+}
+
+/* Specyficzny kolor dla suwaka jasności Ekranu TFT */
+#screen-brightness-slider::-webkit-slider-thumb {
+    background: #3498db; /* Niebieski dla Ekranu */
+}
+
+/* --- SEKCJA ZAAWANSOWANE OŚWIETLENIE (Poprawki układu) --- */
+.led-advanced .led-row {
+    flex-wrap: wrap; /* Pozwala elementom spadać niżej na małym ekranie */
+}
+
+.led-advanced input[type="range"] {
+    flex-grow: 1; /* Suwak zajmie dostępne miejsce */
+    margin-left: 15px; /* Odstęp od etykiety */
+}
+
+@media (max-width: 600px) {
+    .led-advanced input[type="range"] {
+        margin-left: 0;
+        margin-top: 10px;
+        width: 100%;
+    }
+}
 /* --- WYKRESY --- */
 .chart-container {
     height: 300px;
