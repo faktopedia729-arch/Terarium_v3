@@ -24,12 +24,13 @@ const unsigned char icon_hum_bitmap[] PROGMEM = {
 }; 
 
 // --- KONFIGURACJA PINÓW ---
-#define DHTPIN D2
+// UWAGA: Utrzymujemy zamianę (DHT na D3, LED na D2), bo to najlepsza opcja
+#define DHTPIN D3
 #define DHTTYPE DHT22
 #define RELAY_MATA D1      
 #define MOS_WIATRACZEK 3   // RX
 #define MOS_MGLA 1         // TX
-#define RGB_PIN D3
+#define RGB_PIN D2         // PIN CZYSTY (bez pull-up)
 #define NUM_LEDS 120
 
 #define TFT_CS D8
@@ -105,10 +106,9 @@ void handleButtons();
 
 void setup() {
   // [WAŻNE] Zwiększenie taktowania CPU do 160MHz
-  // To drastycznie poprawia stabilność sygnału dla diod WS2812b
   system_update_cpu_freq(160);
 
-  Serial.begin(115200);
+  // Serial.begin(115200); // USUNIĘTE: Konflikt z MOS_WIATRACZEK i MOS_MGLA
   
   pinMode(MOS_WIATRACZEK, FUNCTION_3); 
   pinMode(MOS_MGLA, FUNCTION_3); 
@@ -151,7 +151,7 @@ void setup() {
   timeClient.begin();
 
   if (!Firebase.beginStream(fbdoStream, "/")) {
-     Serial.println("Błąd strumienia: " + fbdoStream.errorReason());
+     // Serial wyłączony - nie drukujemy błędów
   }
   Firebase.setStreamCallback(fbdoStream, streamCallback, streamTimeoutCallback);
   
@@ -185,7 +185,6 @@ void loop() {
   
   checkReset();
   
-  // Daj chwilę oddechu dla WiFi (zapobiega resetom przy intensywnej pracy)
   delay(1); 
 }
 
@@ -222,11 +221,9 @@ int timeStringToMinutes(String timeStr) {
     return h * 60 + m;
 }
 
-// --- ZOPTMALIZOWANA FUNKCJA ODBIORU DANYCH ---
 void streamCallback(StreamData data) {
   String path = data.dataPath();
   
-  // A. OBSŁUGA POJEDYNCZYCH WARTOŚCI
   if (path == "/actuators/led") {
       bool newVal = data.boolData();
       if(st_led != newVal) { st_led = newVal; update_leds_needed = true; }
@@ -256,7 +253,6 @@ void streamCallback(StreamData data) {
       return;
   }
 
-  // B. OBSŁUGA PACZEK JSON
   if (path == "/" || path == "/actuators" || path == "/settings") {
     String json = data.jsonString();
     if (json.length() > 0) {
@@ -307,26 +303,52 @@ void streamCallback(StreamData data) {
 
 void streamTimeoutCallback(bool timeout) { }
 
+// --- NAPRAWIONA FUNKCJA LED - TRYB INPUT ---
 void handleLEDEffects() {
-  // 1. ZABEZPIECZENIE: Stan OFF (Wyłączone)
+  // 1. WYŁĄCZANIE (OFF)
   if (!st_led) {
-    // Jeśli właśnie wyłączyliśmy, albo flaga jest podniesiona
     if (update_leds_needed || is_led_actually_on) { 
-       strip.clear();
+       
+       // a) Wyślij czarny kolor
+       for(int i=0; i<NUM_LEDS; i++) {
+           strip.setPixelColor(i, 0, 0, 0);
+       }
        strip.show();
+       
+       // b) Czekaj na stabilizację
+       delay(50); 
+       
+       // c) Wyślij ponownie
+       strip.show();
+       delay(2);
+
+       // d) FIX OSTATECZNY: Ustaw pin jako INPUT (wysoka impedancja)
+       // To odcina pin elektronicznie, jakbyś uciął kabel
+       pinMode(RGB_PIN, INPUT); 
+
        update_leds_needed = false;
-       is_led_actually_on = false; // Zapamiętujemy, że zgaszone
+       is_led_actually_on = false; 
     }
-    // NIE wysyłamy strip.show() w pętli jeśli już zgaszone - to eliminuje szumy!
+    
+    // Upewnij się, że pin jest cały czas odłączony, gdy LED off
+    pinMode(RGB_PIN, INPUT); 
+    
     return;
   }
+  
+  // 2. WŁĄCZANIE (ON)
+  // Jeśli włączamy, musimy przywrócić pin jako OUTPUT
+  if (!is_led_actually_on) {
+      pinMode(RGB_PIN, OUTPUT);
+      // Opcjonalnie: krótki delay żeby pin wstał
+      delay(1);
+  }
 
-  // Jeśli tu jesteśmy, to znaczy że mają świecić
   is_led_actually_on = true;
 
   if (led_brightness < 5) led_brightness = 5; 
 
-  // 2. STATIC
+  // --- EFEKTY ---
   if (led_mode == "static") {
     if (update_leds_needed) {
        strip.setBrightness(led_brightness);
@@ -335,7 +357,6 @@ void handleLEDEffects() {
        update_leds_needed = false;
     }
   } 
-  // 3. FIRE
   else if (led_mode == "fire") {
     if (millis() - last_effect_time > 80) { 
       last_effect_time = millis();
@@ -348,7 +369,6 @@ void handleLEDEffects() {
       strip.show();
     }
   }
-  // 4. STORM
   else if (led_mode == "storm") {
     static unsigned long lastStormFrame = 0;
     if (millis() - lastStormFrame > 50) {
@@ -363,7 +383,6 @@ void handleLEDEffects() {
             strip.show(); 
         } 
         else { 
-            // Odśwież tło BARDZO rzadko
             static unsigned long lastBgRefresh = 0;
             if (millis() - lastBgRefresh > 2000) {
                lastBgRefresh = millis();
@@ -374,7 +393,6 @@ void handleLEDEffects() {
         }
     }
   }
-  // 5. SUNRISE
   else if (led_mode == "sunrise") {
     if (update_leds_needed) {
         strip.setBrightness(led_brightness);
@@ -395,7 +413,6 @@ void handleSensorsAndFirebase() {
   if (!isnan(newT)) temp = newT;
   if (!isnan(newH)) hum = newH;
 
-  // Sterowanie Fizyczne
   digitalWrite(RELAY_MATA, st_mata ? RELAY_ON : RELAY_OFF);
   digitalWrite(MOS_MGLA, st_mgla ? RELAY_ON : RELAY_OFF); 
   digitalWrite(MOS_WIATRACZEK, st_fan ? MOSFET_ON : MOSFET_OFF);
@@ -403,7 +420,7 @@ void handleSensorsAndFirebase() {
   FirebaseJson json;
   json.set("temperature", temp);
   json.set("humidity", hum);
-  json.set("timestamp", timeClient.getEpochTime() - 3600); // UTC FIX
+  json.set("timestamp", timeClient.getEpochTime() - 3600); 
   json.set("last_sync", timeClient.getFormattedTime());
   Firebase.updateNode(fbdo, "/readings", json);
   
@@ -421,7 +438,7 @@ void handleSensorsAndFirebase() {
       FirebaseJson histJson;
       histJson.set("t", temp);
       histJson.set("h", hum);
-      String timestampStr = String(timeClient.getEpochTime() - 3600); // UTC FIX
+      String timestampStr = String(timeClient.getEpochTime() - 3600); 
       Firebase.updateNode(fbdo, "/history/" + timestampStr, histJson);
   }
 }
