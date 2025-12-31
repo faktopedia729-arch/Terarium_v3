@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, onValue, set, update, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+// DODAŁEM 'get' DO IMPORTÓW PONIŻEJ:
+import { getDatabase, ref, onValue, set, update, query, limitToLast, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 // --- KONFIGURACJA FIREBASE ---
@@ -139,7 +140,7 @@ function initApp() {
 
             updateToggleButton('auto-mode-toggle-btn', s.auto_enabled);
 
-            // NOWOŚĆ: Synchronizacja suwaka jasności ekranu z bazą
+            // Synchronizacja suwaka jasności ekranu z bazą
             if (s.lcd_brightness !== undefined) {
                 document.getElementById('screen-brightness-slider').value = s.lcd_brightness;
             }
@@ -172,21 +173,45 @@ function checkConnectionHealth() {
     }
 }
 
-// --- FUNKCJE STERUJĄCE ---
+// --- FUNKCJE STERUJĄCE (POPRAWIONE) ---
 
-const toggleFirebase = (path) => {
-    const r = ref(db, path);
-    onValue(r, (sn) => {
-        set(r, !sn.val());
-    }, { onlyOnce: true });
+// Nowa, inteligentna funkcja przełączania
+const toggleDevice = (device) => {
+    const dbRef = ref(db);
+    
+    // 1. Pobierz aktualny stan urządzenia
+    get(ref(db, `actuators/${device}`)).then((snapshot) => {
+        const currentVal = snapshot.val();
+        const newVal = !currentVal;
+        
+        const updates = {};
+        // Ustaw nową wartość urządzenia
+        updates[`actuators/${device}`] = newVal;
+
+        // WAŻNE FIX: Jeśli sterujemy Matą, Wiatrakiem lub Mgłą -> WYŁĄCZAMY TRYB AUTO
+        // Dzięki temu NodeMCU nie nadpisuje naszej decyzji
+        if (['heater', 'mist', 'fan'].includes(device)) {
+            updates['settings/auto_enabled'] = false;
+        }
+
+        // Wyślij wszystko w jednej paczce do Firebase
+        update(dbRef, updates)
+            .then(() => console.log(`Przełączono ${device} na ${newVal} (Auto wyłączone)`))
+            .catch((error) => alert("Błąd przełączania: " + error.message));
+    });
 };
 
-// Przypisanie zdarzeń do przycisków
-document.getElementById('heater-toggle-btn').onclick = () => toggleFirebase('actuators/heater');
-document.getElementById('mist-toggle-btn').onclick = () => toggleFirebase('actuators/mist');
-document.getElementById('fan-toggle-btn').onclick = () => toggleFirebase('actuators/fan');
-document.getElementById('led-toggle-btn').onclick = () => toggleFirebase('actuators/led');
-document.getElementById('auto-mode-toggle-btn').onclick = () => toggleFirebase('settings/auto_enabled');
+// Przypisanie zdarzeń do przycisków (Używamy nowej funkcji toggleDevice)
+document.getElementById('heater-toggle-btn').onclick = () => toggleDevice('heater');
+document.getElementById('mist-toggle-btn').onclick = () => toggleDevice('mist');
+document.getElementById('fan-toggle-btn').onclick = () => toggleDevice('fan');
+document.getElementById('led-toggle-btn').onclick = () => toggleDevice('led');
+
+// Przycisk Auto Mode - tu wystarczy zwykłe przełączenie samej flagi
+document.getElementById('auto-mode-toggle-btn').onclick = () => {
+    const autoRef = ref(db, 'settings/auto_enabled');
+    get(autoRef).then((sn) => set(autoRef, !sn.val()));
+};
 
 // ZDALNY RESET
 document.getElementById('reset-device-btn').onclick = () => {
@@ -208,7 +233,7 @@ window.updateColor = (hex) => {
     const g = parseInt(hex.substring(3, 5), 16);
     const b = parseInt(hex.substring(5, 7), 16);
 
-    // Tu jest FIX: led: true włącza pasek przy zmianie koloru
+    // led: true włącza pasek przy zmianie koloru
     update(ref(db, 'actuators'), {
         led_r: r, led_g: g, led_b: b, 
         led_mode: 'static',
@@ -222,11 +247,10 @@ document.getElementById('brightness-slider').onchange = (e) => {
     set(ref(db, 'actuators/brightness'), parseInt(e.target.value));
 };
 
-// NOWOŚĆ: Jasność Ekranu TFT (Używamy onchange)
+// Jasność Ekranu TFT
 const screenSlider = document.getElementById('screen-brightness-slider');
 if (screenSlider) {
     screenSlider.onchange = (e) => {
-        // Zapisujemy do SETTINGS, nie actuators
         update(ref(db, 'settings'), { lcd_brightness: parseInt(e.target.value) });
     };
 }
@@ -235,7 +259,6 @@ if (screenSlider) {
 document.querySelectorAll('.effect-btn').forEach(btn => {
     btn.onclick = () => {
         const mode = btn.getAttribute('data-mode');
-        // Tu jest FIX: led: true włącza pasek przy zmianie trybu
         update(ref(db, 'actuators'), { led_mode: mode, led: true });
     };
 });
