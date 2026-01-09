@@ -149,17 +149,32 @@ function initApp() {
     renderRecentColors();
 }
 
-// ✅ NOWA FUNKCJA: Inicjalizacja checkboxa LED AUTO
+// ✅ POPRAWIONA FUNKCJA: Inicjalizacja checkboxa LED AUTO
 function initLedAutoCheckbox() {
     const checkbox = document.getElementById('led-auto-checkbox');
     const checkmark = document.getElementById('led-auto-checkmark');
     const visual = document.getElementById('led-auto-checkbox-visual');
 
-    if (!checkbox || !checkmark || !visual) return;
+    if (!checkbox || !checkmark || !visual) {
+        console.error("❌ Nie znaleziono elementów checkboxa LED AUTO");
+        return;
+    }
+
+    console.log("✅ Inicjalizacja checkboxa LED AUTO");
+
+    // Pobierz początkowy stan z Firebase
+    get(ref(db, 'settings/led_auto_enabled')).then((snapshot) => {
+        const initialState = snapshot.exists() ? snapshot.val() : true;
+        updateLedAutoCheckbox(initialState);
+        console.log("📥 LED AUTO początkowy stan z Firebase:", initialState);
+    }).catch((error) => {
+        console.error("❌ Błąd odczytu LED AUTO z Firebase:", error);
+    });
 
     // Obsługa kliknięcia
     checkbox.addEventListener('change', () => {
         const isChecked = checkbox.checked;
+        console.log("🖱️ LED AUTO kliknięty, nowy stan:", isChecked);
         
         // Wizualna aktualizacja
         if (isChecked) {
@@ -176,19 +191,28 @@ function initLedAutoCheckbox() {
         update(ref(db, 'settings'), {
             led_auto_enabled: isChecked
         }).then(() => {
-            console.log(`LED AUTO ${isChecked ? 'włączone' : 'wyłączone'}`);
+            console.log(`✅ LED AUTO zapisane do Firebase: ${isChecked}`);
+        }).catch((error) => {
+            console.error("❌ Błąd zapisu LED AUTO:", error);
+            alert("Błąd zapisu: " + error.message);
         });
     });
+
+    console.log("✅ Event listener checkboxa podpięty");
 }
 
-// ✅ NOWA FUNKCJA: Aktualizacja wizualizacji checkboxa (bez triggerowania eventu)
+// ✅ POPRAWIONA FUNKCJA: Aktualizacja wizualizacji checkboxa
 function updateLedAutoCheckbox(isEnabled) {
     const checkbox = document.getElementById('led-auto-checkbox');
     const checkmark = document.getElementById('led-auto-checkmark');
     const visual = document.getElementById('led-auto-checkbox-visual');
 
-    if (!checkbox || !checkmark || !visual) return;
+    if (!checkbox || !checkmark || !visual) {
+        console.warn("⚠️ updateLedAutoCheckbox: brak elementów");
+        return;
+    }
 
+    // Ustaw stan bez triggerowania eventu
     checkbox.checked = isEnabled;
     
     if (isEnabled) {
@@ -200,6 +224,8 @@ function updateLedAutoCheckbox(isEnabled) {
         visual.style.background = '#1e1e1e';
         visual.style.borderColor = '#555';
     }
+    
+    console.log("🎨 LED AUTO wizualizacja zaktualizowana:", isEnabled);
 }
 
 // --- FUNKCJA WATCHDOG ---
@@ -318,7 +344,10 @@ document.getElementById('save-settings-btn').onclick = () => {
     };
     
     update(ref(db, 'settings'), updates)
-        .then(() => alert("Harmonogram zapisany!"))
+        .then(() => {
+            alert("Harmonogram zapisany!");
+            console.log("✅ Harmonogram zapisany z LED AUTO:", updates.led_auto_enabled);
+        })
         .catch(err => alert("Błąd zapisu: " + err.message));
 };
 
