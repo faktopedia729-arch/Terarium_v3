@@ -1,5 +1,4 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-// DODAŁEM 'get' DO IMPORTÓW PONIŻEJ:
 import { getDatabase, ref, onValue, set, update, query, limitToLast, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
@@ -17,13 +16,12 @@ const db = getDatabase(app);
 const auth = getAuth(app);
 
 // --- ZMIENNE POMOCNICZE ---
-let lastHeartbeat = 0; // Kiedy ostatnio przyszły dane (timestamp)
-let isOfflineDismissed = false; // Czy użytkownik zamknął okno błędu
-const OFFLINE_THRESHOLD = 30000; // 30 sekund bez danych = OFFLINE
+let lastHeartbeat = 0;
+let isOfflineDismissed = false;
+const OFFLINE_THRESHOLD = 30000;
 
 // --- OBSŁUGA LOGOWANIA I STARTU ---
 window.addEventListener('DOMContentLoaded', () => {
-    // Timer sprawdzający połączenie co 5 sekund
     setInterval(checkConnectionHealth, 5000);
 
     const loginBtn = document.getElementById('login-btn');
@@ -38,11 +36,9 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Obsługa zamknięcia okna offline
     document.getElementById('dismiss-offline-btn').addEventListener('click', () => {
         document.getElementById('offline-overlay').style.display = 'none';
         isOfflineDismissed = true;
-        // Ustawiamy kreski, żeby nie mylić użytkownika
         document.getElementById('temperature').innerText = "--.-";
         document.getElementById('humidity').innerText = "--";
     });
@@ -63,7 +59,7 @@ onAuthStateChanged(auth, (user) => {
 
 // --- GŁÓWNA LOGIKA APLIKACJI ---
 function initApp() {
-    // 1. Odczyty z czujników (Dashboard) + HEARTBEAT
+    // 1. Odczyty z czujników
     onValue(ref(db, 'readings'), (sn) => {
         const d = sn.val();
         if (d) {
@@ -74,7 +70,6 @@ function initApp() {
             const isFresh = timeDiff < OFFLINE_THRESHOLD;
 
             if (isFresh) {
-                // DANE ŚWIEŻE -> Wyświetlamy
                 if(isOfflineDismissed) isOfflineDismissed = false;
                 document.getElementById('offline-overlay').style.display = 'none';
                 
@@ -85,7 +80,6 @@ function initApp() {
                 document.getElementById('connection-status').innerText = "Ostatnia aktualizacja: " + nodeTime;
                 document.getElementById('connection-status').style.color = "#95a5a6";
             } else {
-                // DANE STARE
                 if (!isOfflineDismissed) {
                     document.getElementById('offline-overlay').style.display = 'flex';
                 }
@@ -108,7 +102,6 @@ function initApp() {
             updateToggleButton('fan-toggle-btn', d.fan);
             updateToggleButton('led-toggle-btn', d.led);
             
-            // Suwak jasności taśmy LED
             if (d.brightness !== undefined) {
                 document.getElementById('brightness-slider').value = d.brightness;
             }
@@ -124,31 +117,89 @@ function initApp() {
         }
     });
 
-    // 3. Synchronizacja Ustawień (W TYM JASNOŚĆ EKRANU TFT)
+    // 3. Synchronizacja Ustawień
     onValue(ref(db, 'settings'), (sn) => {
         const s = sn.val();
         if (s) {
-            // Dzień
             document.getElementById('day-temp-input').value = s.day_temp || 28.0;
             document.getElementById('day-hum-input').value = s.day_hum || 60;
             document.getElementById('day-start-time').value = s.day_start || "08:00";
             
-            // Noc
             document.getElementById('night-temp-input').value = s.night_temp || 22.0;
             document.getElementById('night-hum-input').value = s.night_hum || 80;
             document.getElementById('night-start-time').value = s.night_start || "20:00";
 
             updateToggleButton('auto-mode-toggle-btn', s.auto_enabled);
 
-            // Synchronizacja suwaka jasności ekranu z bazą
             if (s.lcd_brightness !== undefined) {
                 document.getElementById('screen-brightness-slider').value = s.lcd_brightness;
+            }
+
+            // ✅ Synchronizacja checkboxa LED AUTO
+            if (s.led_auto_enabled !== undefined) {
+                updateLedAutoCheckbox(s.led_auto_enabled);
             }
         }
     });
 
+    // ✅ Inicjalizacja obsługi checkboxa LED AUTO
+    initLedAutoCheckbox();
+
     initChart();
     renderRecentColors();
+}
+
+// ✅ NOWA FUNKCJA: Inicjalizacja checkboxa LED AUTO
+function initLedAutoCheckbox() {
+    const checkbox = document.getElementById('led-auto-checkbox');
+    const checkmark = document.getElementById('led-auto-checkmark');
+    const visual = document.getElementById('led-auto-checkbox-visual');
+
+    if (!checkbox || !checkmark || !visual) return;
+
+    // Obsługa kliknięcia
+    checkbox.addEventListener('change', () => {
+        const isChecked = checkbox.checked;
+        
+        // Wizualna aktualizacja
+        if (isChecked) {
+            checkmark.style.display = 'block';
+            visual.style.background = '#3498db';
+            visual.style.borderColor = '#3498db';
+        } else {
+            checkmark.style.display = 'none';
+            visual.style.background = '#1e1e1e';
+            visual.style.borderColor = '#555';
+        }
+        
+        // Zapis do Firebase
+        update(ref(db, 'settings'), {
+            led_auto_enabled: isChecked
+        }).then(() => {
+            console.log(`LED AUTO ${isChecked ? 'włączone' : 'wyłączone'}`);
+        });
+    });
+}
+
+// ✅ NOWA FUNKCJA: Aktualizacja wizualizacji checkboxa (bez triggerowania eventu)
+function updateLedAutoCheckbox(isEnabled) {
+    const checkbox = document.getElementById('led-auto-checkbox');
+    const checkmark = document.getElementById('led-auto-checkmark');
+    const visual = document.getElementById('led-auto-checkbox-visual');
+
+    if (!checkbox || !checkmark || !visual) return;
+
+    checkbox.checked = isEnabled;
+    
+    if (isEnabled) {
+        checkmark.style.display = 'block';
+        visual.style.background = '#3498db';
+        visual.style.borderColor = '#3498db';
+    } else {
+        checkmark.style.display = 'none';
+        visual.style.background = '#1e1e1e';
+        visual.style.borderColor = '#555';
+    }
 }
 
 // --- FUNKCJA WATCHDOG ---
@@ -173,47 +224,37 @@ function checkConnectionHealth() {
     }
 }
 
-// --- FUNKCJE STERUJĄCE (POPRAWIONE) ---
-
-// Nowa, inteligentna funkcja przełączania
+// --- FUNKCJE STERUJĄCE ---
 const toggleDevice = (device) => {
     const dbRef = ref(db);
     
-    // 1. Pobierz aktualny stan urządzenia
     get(ref(db, `actuators/${device}`)).then((snapshot) => {
         const currentVal = snapshot.val();
         const newVal = !currentVal;
         
         const updates = {};
-        // Ustaw nową wartość urządzenia
         updates[`actuators/${device}`] = newVal;
 
-        // WAŻNE FIX: Jeśli sterujemy Matą, Wiatrakiem lub Mgłą -> WYŁĄCZAMY TRYB AUTO
-        // Dzięki temu NodeMCU nie nadpisuje naszej decyzji
         if (['heater', 'mist', 'fan'].includes(device)) {
             updates['settings/auto_enabled'] = false;
         }
 
-        // Wyślij wszystko w jednej paczce do Firebase
         update(dbRef, updates)
-            .then(() => console.log(`Przełączono ${device} na ${newVal} (Auto wyłączone)`))
+            .then(() => console.log(`Przełączono ${device} na ${newVal}`))
             .catch((error) => alert("Błąd przełączania: " + error.message));
     });
 };
 
-// Przypisanie zdarzeń do przycisków (Używamy nowej funkcji toggleDevice)
 document.getElementById('heater-toggle-btn').onclick = () => toggleDevice('heater');
 document.getElementById('mist-toggle-btn').onclick = () => toggleDevice('mist');
 document.getElementById('fan-toggle-btn').onclick = () => toggleDevice('fan');
 document.getElementById('led-toggle-btn').onclick = () => toggleDevice('led');
 
-// Przycisk Auto Mode - tu wystarczy zwykłe przełączenie samej flagi
 document.getElementById('auto-mode-toggle-btn').onclick = () => {
     const autoRef = ref(db, 'settings/auto_enabled');
     get(autoRef).then((sn) => set(autoRef, !sn.val()));
 };
 
-// ZDALNY RESET
 document.getElementById('reset-device-btn').onclick = () => {
     if(confirm("Czy na pewno chcesz zrestartować NodeMCU?")) {
         set(ref(db, 'system/reset'), true)
@@ -233,7 +274,6 @@ window.updateColor = (hex) => {
     const g = parseInt(hex.substring(3, 5), 16);
     const b = parseInt(hex.substring(5, 7), 16);
 
-    // led: true włącza pasek przy zmianie koloru
     update(ref(db, 'actuators'), {
         led_r: r, led_g: g, led_b: b, 
         led_mode: 'static',
@@ -242,12 +282,10 @@ window.updateColor = (hex) => {
     saveRecentColor(hex);
 };
 
-// Jasność Taśmy LED (Używamy onchange żeby nie spamować bazy)
 document.getElementById('brightness-slider').onchange = (e) => {
     set(ref(db, 'actuators/brightness'), parseInt(e.target.value));
 };
 
-// Jasność Ekranu TFT
 const screenSlider = document.getElementById('screen-brightness-slider');
 if (screenSlider) {
     screenSlider.onchange = (e) => {
@@ -255,7 +293,6 @@ if (screenSlider) {
     };
 }
 
-// Tryby Efektów
 document.querySelectorAll('.effect-btn').forEach(btn => {
     btn.onclick = () => {
         const mode = btn.getAttribute('data-mode');
@@ -263,18 +300,21 @@ document.querySelectorAll('.effect-btn').forEach(btn => {
     };
 });
 
-// ZAPIS NOWYCH USTAWIEŃ (Harmonogram)
+// ✅ ZAPIS HARMONOGRAMU (z LED AUTO)
 document.getElementById('save-settings-btn').onclick = () => {
+    const ledAutoCheckbox = document.getElementById('led-auto-checkbox');
+    
     const updates = {
-        // Dzień
         day_temp: parseFloat(document.getElementById('day-temp-input').value),
         day_hum: parseInt(document.getElementById('day-hum-input').value),
         day_start: document.getElementById('day-start-time').value,
         
-        // Noc
         night_temp: parseFloat(document.getElementById('night-temp-input').value),
         night_hum: parseInt(document.getElementById('night-hum-input').value),
-        night_start: document.getElementById('night-start-time').value
+        night_start: document.getElementById('night-start-time').value,
+        
+        // ✅ Zapisz stan LED AUTO
+        led_auto_enabled: ledAutoCheckbox ? ledAutoCheckbox.checked : true
     };
     
     update(ref(db, 'settings'), updates)
