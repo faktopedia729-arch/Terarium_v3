@@ -117,27 +117,30 @@
                 </button>
             </div>
 
-            <!-- ✅ NOWA SEKCJA: LED AUTO MODE -->
+            <!-- ✅ POPRAWIONA SEKCJA: LED AUTO MODE -->
             <div style="background: rgba(52, 152, 219, 0.1); border: 1px solid #3498db; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
-                <label style="display: flex; align-items: center; cursor: pointer; gap: 12px;">
-                    <div style="position: relative; width: 24px; height: 24px;">
-                        <input type="checkbox" id="led-auto-checkbox" checked style="position: absolute; opacity: 0; cursor: pointer;">
+                <label id="led-auto-label" style="display: flex; align-items: center; cursor: pointer; gap: 12px;">
+                    <div style="position: relative; width: 24px; height: 24px; flex-shrink: 0;">
+                        <input type="checkbox" id="led-auto-checkbox" checked style="position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; z-index: 1;">
                         <span id="led-auto-checkbox-visual" style="
                             display: inline-block;
                             width: 24px;
                             height: 24px;
                             border: 2px solid #3498db;
                             border-radius: 4px;
-                            background: #1e1e1e;
-                            position: relative;
+                            background: #3498db;
+                            position: absolute;
+                            top: 0;
+                            left: 0;
                             transition: all 0.3s ease;
+                            pointer-events: none;
                         ">
                             <i class="fas fa-check" id="led-auto-checkmark" style="
                                 position: absolute;
                                 top: 50%;
                                 left: 50%;
                                 transform: translate(-50%, -50%);
-                                color: #3498db;
+                                color: #fff;
                                 font-size: 14px;
                                 display: block;
                             "></i>
